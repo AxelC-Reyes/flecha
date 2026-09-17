@@ -23,6 +23,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from uso import Uso  # noqa: E402
+
 RAIZ = Path(__file__).resolve().parent
 WEB = RAIZ / "web"
 PUERTO = 4747
@@ -134,6 +137,7 @@ def validar(estado):
 class Manejador(BaseHTTPRequestHandler):
     server_version = "Trayecto"
     almacen = None
+    uso = None
     anfitriones = None  # None = cualquiera (modo --red)
 
     def log_message(self, formato, *args):
@@ -178,6 +182,8 @@ class Manejador(BaseHTTPRequestHandler):
         ruta = self.path.split("?", 1)[0].split("#", 1)[0]
         if ruta == "/api/estado":
             return self._leer_estado()
+        if ruta == "/api/uso":
+            return self._json(HTTPStatus.OK, self.uso.resumen())
         if ruta.startswith("/api/"):
             return self._json(HTTPStatus.NOT_FOUND, {"error": "no existe"})
         return self._archivo(ruta)
@@ -238,9 +244,10 @@ def ip_local():
         return None
 
 
-def crear_servidor(carpeta, puerto=PUERTO, red=False, ruidoso=False):
+def crear_servidor(carpeta, puerto=PUERTO, red=False, ruidoso=False, casa=None):
     manejador = type("ManejadorTrayecto", (Manejador,), {})
     manejador.almacen = Almacen(carpeta)
+    manejador.uso = Uso(carpeta, casa)
     servidor = ThreadingHTTPServer(("0.0.0.0" if red else "127.0.0.1", puerto), manejador)
     servidor.daemon_threads = True
     servidor.ruidoso = ruidoso
@@ -274,6 +281,39 @@ def abrir_ventana(url):
     return False
 
 
+def conectar_claude():
+    """Registra integraciones/claude_statusline.py como status line de Claude Code."""
+    ajustes = Path(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser() / "settings.json"
+    guion = RAIZ / "integraciones" / "claude_statusline.py"
+    comando = f'python3 "{guion}"'
+    try:
+        datos = json.loads(ajustes.read_text(encoding="utf-8")) if ajustes.exists() else {}
+    except (OSError, ValueError) as error:
+        print(f"No pude leer {ajustes}: {error}", file=sys.stderr)
+        return 1
+    actual = datos.get("statusLine")
+    if isinstance(actual, dict) and "claude_statusline.py" in str(actual.get("command", "")):
+        print("Claude Code ya está conectado con Trayecto.")
+        return 0
+    if actual:
+        print("Ya tienes una status line en Claude Code y no la voy a pisar:")
+        print(f"  {json.dumps(actual, ensure_ascii=False)}")
+        print("Para conservarla y conectar Trayecto, cambia su comando por este:")
+        print(f"  TRAYECTO_STATUSLINE_SIGUIENTE='<tu comando actual>' {comando}")
+        return 1
+    datos["statusLine"] = {"type": "command", "command": comando}
+    ajustes.parent.mkdir(parents=True, exist_ok=True)
+    if ajustes.exists():
+        shutil.copyfile(ajustes, ajustes.with_name("settings.json.antes-de-trayecto"))
+    temporal = ajustes.with_name("settings.json.tmp")
+    temporal.write_text(json.dumps(datos, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporal, ajustes)
+    print(f"Listo. Claude Code le pasará sus límites a Trayecto ({ajustes}).")
+    print("Los porcentajes aparecen después del primer mensaje de tu siguiente sesión.")
+    print('Para quitarlo, borra "statusLine" de ese archivo.')
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="trayecto", description="Tus proyectos y su avance, en una línea.")
     p.add_argument("--puerto", type=int, default=int(os.environ.get("TRAYECTO_PUERTO", PUERTO)))
@@ -282,7 +322,10 @@ def main(argv=None):
     p.add_argument("--ventana", action="store_true", help="abre una ventana sin barras (Chrome, Edge o Brave)")
     p.add_argument("--sin-abrir", action="store_true", help="no abre el navegador")
     p.add_argument("--ruidoso", action="store_true", help="muestra cada petición")
+    p.add_argument("--conectar-claude", action="store_true", help="conecta los límites de Claude Code con la sección Uso, y termina")
     args = p.parse_args(argv)
+    if args.conectar_claude:
+        return conectar_claude()
 
     carpeta = carpeta_datos(args.datos)
     try:

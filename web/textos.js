@@ -53,6 +53,15 @@
     avisoImportMal: 'Ese archivo no es de Trayecto',
     avisoNoGuardo: 'No se pudo guardar',
     deshacer: 'Deshacer',
+    uso: 'Uso',
+    ventana5h: '5 h',
+    ventana7d: 'semana',
+    ventanaGasto: 'gasto',
+    reinicia: 'se reinicia en',
+    sinUso: 'sin uso en esta ventana',
+    hoy: 'hoy',
+    sieteDias: '7 días',
+    conectarClaude: 'Para ver los límites de Claude, corre una vez: ./trayecto --conectar-claude',
   };
 
   const en = {
@@ -105,6 +114,15 @@
     avisoImportMal: 'That file is not from Trayecto',
     avisoNoGuardo: 'Could not save',
     deshacer: 'Undo',
+    uso: 'Usage',
+    ventana5h: '5 h',
+    ventana7d: 'week',
+    ventanaGasto: 'spend',
+    reinicia: 'resets in',
+    sinUso: 'unused in this window',
+    hoy: 'today',
+    sieteDias: '7 days',
+    conectarClaude: 'To see Claude limits, run once: ./trayecto --conectar-claude',
   };
 
   const idioma = ((raiz.navigator && raiz.navigator.language) || 'es').toLowerCase().startsWith('en') ? 'en' : 'es';

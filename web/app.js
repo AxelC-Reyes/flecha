@@ -29,6 +29,8 @@
   let creando = false;
   let ajustando = false;
   let anterior = null; // copia del estado para "Deshacer"
+  let uso = null; // consumo de asistentes de código, solo con servidor local
+  let relojUso = null;
   let relojAviso = null;
   const pintado = new Map(); // id de proyecto -> fracción ya dibujada, para animar desde ahí
 
@@ -57,6 +59,7 @@
     ajustes: trazo('<path d="M4.5 7h15M4.5 12h15M4.5 17h15"/><circle cx="9" cy="7" r="2.1" fill="currentColor"/><circle cx="15.5" cy="12" r="2.1" fill="currentColor"/><circle cx="8" cy="17" r="2.1" fill="currentColor"/>'),
     atras: trazo('<path d="m14.5 5.5-6.5 6.5 6.5 6.5"/>', 'stroke-width="2.2"'),
     revertir: trazo('<path d="M8.5 5.5 4.5 9.5l4 4"/><path d="M4.5 9.5h9.2a5.3 5.3 0 0 1 0 10.6H9.5"/>'),
+    uso: trazo('<path d="M5.2 17.2a8.3 8.3 0 1 1 13.6 0"/><path d="m12 13.2 3.4-4.4"/><circle cx="12" cy="13.2" r="1.1" fill="currentColor"/>'),
     equis: trazo('<path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/>', 'stroke-width="2.4"'),
     palomita: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.4 11.4 3.1 3.1 6.1-6.7"/></svg>',
   };
@@ -134,20 +137,31 @@
     requestAnimationFrame(() => requestAnimationFrame(() => barra.relleno.style.setProperty('--p', fraccion)));
   }
 
+  // Qué barras van por fuera del cuadrado: proyectos en la lista, límites en la vista de uso.
+  function filasDeBarras() {
+    if (vista.nombre === 'uso') {
+      return filasUso().map((f) => ({
+        id: `uso:${f.id}`,
+        fraccion: Math.min(1, f.usado / 100),
+        pct: Math.round(f.usado),
+        color: f.usado >= 90 ? 'var(--peligro)' : null,
+      }));
+    }
+    return estado.proyectos.map((p, i) => ({ id: p.id, fraccion: L.avance(estado, p.id), pct: L.porcentaje(estado, p.id), color: colorDeBarra(i) }));
+  }
+
   function pintarBarras(entrada) {
-    const filas = estado.proyectos.map((p, i) => {
-      const barra = crearBarra(i, colorDeBarra(i));
-      const fraccion = L.avance(estado, p.id);
-      const pct = L.porcentaje(estado, p.id);
+    if (!abierto) pintado.clear();
+    const filas = filasDeBarras().map((f, i) => {
+      const barra = crearBarra(i, f.color);
       if (!abierto) {
         barra.relleno.style.setProperty('--p', 0);
-        barra.cifra.textContent = pct;
-        pintado.delete(p.id);
+        barra.cifra.textContent = f.pct;
       } else {
-        const desde = entrada ? 0 : pintado.get(p.id) ?? 0;
-        fijarBarra(barra, fraccion, desde);
-        contar(barra.cifra, pct, { desde: Math.round(desde * 100), espera: entrada ? i * 32 + 300 : 0 });
-        pintado.set(p.id, fraccion);
+        const desde = entrada ? 0 : pintado.get(f.id) ?? 0;
+        fijarBarra(barra, f.fraccion, desde);
+        contar(barra.cifra, f.pct, { desde: Math.round(desde * 100), espera: entrada ? i * 32 + 300 : 0 });
+        pintado.set(f.id, f.fraccion);
       }
       return barra.fila;
     });
@@ -186,10 +200,12 @@
   function medir() {
     const estilo = getComputedStyle(escena);
     const libre = escena.clientHeight - parseFloat(estilo.paddingTop) - parseFloat(estilo.paddingBottom);
-    const tope = vista.nombre === 'lista' ? 'none' : `${Math.max(220, libre - (vista.nombre === 'detalle' ? 30 : 0))}px`;
+    const tope = conBarras() ? 'none' : `${Math.max(220, libre - (vista.nombre === 'detalle' ? 30 : 0))}px`;
     widget.style.setProperty('--tope', tope);
     widget.style.setProperty('--alto', `${contenido.offsetHeight}px`);
   }
+
+  const conBarras = () => vista.nombre === 'lista' || vista.nombre === 'uso';
 
   function crecer(campo) {
     if (window.CSS && CSS.supports('field-sizing', 'content')) return;
@@ -238,10 +254,12 @@
   function pintar(entrada = false) {
     if (vista.nombre === 'detalle' && !estado.proyectos.some((p) => p.id === vista.id)) vista = { nombre: 'lista' };
     widget.dataset.vista = vista.nombre;
-    const vistas = { lista: vistaLista, detalle: vistaDetalle, finalizadas: vistaFinalizadas, ajustes: vistaAjustes };
+    if (vista.nombre === 'uso' && !hayUso()) vista = { nombre: 'lista' };
+    widget.dataset.vista = vista.nombre;
+    const vistas = { lista: vistaLista, detalle: vistaDetalle, finalizadas: vistaFinalizadas, ajustes: vistaAjustes, uso: vistaUso };
     contenido.replaceChildren(...vistas[vista.nombre]().flat().filter(Boolean));
     contenido.querySelectorAll('textarea').forEach(crecer);
-    pintarBarras(entrada && vista.nombre === 'lista');
+    pintarBarras(entrada && conBarras());
     pintarCima(entrada);
     medir();
   }
@@ -251,6 +269,11 @@
     creando = false;
     ajustando = false;
     widget.classList.add('cambiando');
+    clearInterval(relojUso);
+    if (nueva.nombre === 'uso') {
+      cargarUso();
+      relojUso = setInterval(cargarUso, 30000);
+    }
     setTimeout(() => {
       vista = nueva;
       pintar(true);
@@ -289,6 +312,7 @@
           contenido.querySelector('.campo-proyecto').focus();
         }),
         icono('finalizadas', t('finalizadas'), () => ir({ nombre: 'finalizadas' })),
+        hayUso() && icono('uso', t('uso'), () => ir({ nombre: 'uso' })),
         icono('ajustes', t('personalizar'), () => ir({ nombre: 'ajustes' })),
       ),
     ];
@@ -575,6 +599,71 @@
     return [encabezado(t('finalizadas')), h('div', { class: 'cuerpo' }, cuerpo)];
   }
 
+  // --- uso: límites y tokens de tus asistentes de código ---
+
+  const hayUso = () => !!uso && uso.herramientas.length > 0;
+
+  const VENTANAS = { '5h': 'ventana5h', '7d': 'ventana7d', gasto: 'ventanaGasto' };
+
+  function filasUso() {
+    if (!hayUso()) return [];
+    return uso.herramientas.flatMap((h) =>
+      h.limites.map((l) => ({ id: `${h.id}:${l.id}`, nombre: h.nombre, ventana: VENTANAS[l.id] ? t(VENTANAS[l.id]) : l.id, ...l })),
+    );
+  }
+
+  function compacto(n) {
+    if (n >= 1e6) return `${(n / 1e6).toLocaleString(undefined, { maximumFractionDigits: n >= 1e7 ? 0 : 1 })} M`;
+    if (n >= 1e3) return `${Math.round(n / 1e3)} k`;
+    return String(n);
+  }
+
+  function falta(epoch) {
+    const min = Math.max(1, Math.round((epoch * 1000 - Date.now()) / 60000));
+    if (min >= 2880) return `${Math.floor(min / 1440)} d ${Math.floor((min % 1440) / 60)} h`;
+    if (min >= 60) return `${Math.floor(min / 60)} h ${min % 60} min`;
+    return `${min} min`;
+  }
+
+  function vistaUso() {
+    const filas = filasUso().map((f) =>
+      h(
+        'li',
+        { class: 'limite' },
+        h('b', null, `${f.nombre} · ${f.ventana}`),
+        h('span', null, f.reinicia ? `${t('reinicia')} ${falta(f.reinicia)}` : t('sinUso')),
+      ),
+    );
+    const consumo = h(
+      'div',
+      { class: 'tabla' },
+      h('span', { class: 'rotulo' }, 'Tokens'),
+      h('span', { class: 'rotulo' }, t('hoy')),
+      h('span', { class: 'rotulo' }, t('sieteDias')),
+      uso.herramientas.map((x) => [h('b', null, x.nombre), h('span', null, compacto(x.tokens.hoy)), h('span', null, compacto(x.tokens.semana))]),
+    );
+    const sinConectar = uso.herramientas.some((x) => x.id === 'claude' && !x.conectado);
+    return [
+      encabezado(t('uso')),
+      h('ul', { class: 'proyectos limites' }, filas),
+      h('div', { class: 'consumo' }, consumo, sinConectar && h('p', { class: 'nota' }, t('conectarClaude'))),
+    ];
+  }
+
+  async function cargarUso() {
+    if (!almacen || almacen.modo !== 'servidor') return;
+    try {
+      const r = await fetch('api/uso', { headers: { 'X-Trayecto': '1' }, cache: 'no-store' });
+      if (!r.ok) return;
+      const nuevo = await r.json();
+      const cambio = JSON.stringify(nuevo.herramientas) !== JSON.stringify(uso && uso.herramientas);
+      uso = nuevo;
+      if (cambio && abierto && (vista.nombre === 'uso' || vista.nombre === 'lista') && !creando) pintar();
+    } catch (error) {
+      /* sin servidor no hay sección de uso */
+    }
+  }
+
   // --- personalizar: como elegir la carátula de un reloj ---
 
   function vistaAjustes() {
@@ -706,6 +795,7 @@
     abierto = true;
     asa.setAttribute('aria-expanded', 'true');
     nativo('expandir');
+    cargarUso();
     // En la app nativa la ventana crece primero; se espera un instante a que termine.
     setTimeout(() => {
       if (!abierto) return;
@@ -721,6 +811,7 @@
     creando = false;
     ajustando = false;
     asa.setAttribute('aria-expanded', 'false');
+    clearInterval(relojUso);
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     nativo('cerrando');
     widget.classList.remove('abierto');
@@ -771,7 +862,7 @@
     const nombre = q.get('vista');
     const p = estado.proyectos[Number(q.get('p')) || 0];
     if (nombre === 'detalle' && p) vista = { nombre, id: p.id };
-    else if (nombre === 'finalizadas' || nombre === 'ajustes') vista = { nombre };
+    else if (nombre === 'finalizadas' || nombre === 'ajustes' || nombre === 'uso') vista = { nombre };
     ajustando = q.has('ajustando');
     return true;
   }
@@ -793,6 +884,7 @@
       fallo: () => mostrarAviso(t('avisoNoGuardo')),
     });
     estado = almacen.estado;
+    await cargarUso();
     const demo = aplicarDemo();
     aplicarAjustes();
     pintar();

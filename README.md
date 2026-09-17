@@ -57,6 +57,24 @@ Abre `web/index.html` con doble clic, o publica la carpeta `web/` en cualquier h
 - **Finalizadas** (la palomita) es el archivo. La flecha regresa una tarea a pendientes; si su proyecto ya se había ido, regresa con ella.
 - **Personalizar**: color de las barras (automático, diez colores, multicolor o el que quieras), forma (redondeada, píldora o fina), lado de la pantalla y tema.
 
+## Uso de tus asistentes de código
+
+Si usas Claude Code, Codex o Gemini CLI, Trayecto agrega solo una sección **Uso** (el ícono del medidor): cuánto llevas gastado de cada límite, cuándo se reinicia, y los tokens de hoy y de los últimos 7 días. Así no andas abriendo `/usage` ni `/status`. A partir de 90 % la barra se pone roja.
+
+![Uso de Claude y Codex, con las barras por fuera](capturas/uso.png)
+
+Todo sale de archivos que esas herramientas ya dejan en tu computadora. Trayecto no usa tus contraseñas, no llama a ningún servicio y no lee el contenido de tus conversaciones: solo cuenta tokens.
+
+| Herramienta | Límites (5 h y semana) | Tokens |
+| --- | --- | --- |
+| Codex | Sí, automático. Se actualizan cada vez que usas Codex | Sí |
+| Claude Code | Sí, tras correr una vez `./trayecto --conectar-claude` | Sí |
+| Gemini CLI | No los publica | Sí (lector sin probar con datos reales; se agradecen reportes) |
+
+`--conectar-claude` registra `integraciones/claude_statusline.py` como *status line* de Claude Code, que es por donde Claude Code entrega el uso de tus límites (planes Pro y Max). De paso verás una línea discreta en tu terminal, por ejemplo `Fable 5.1 · 5 h 41% · 7 d 29%`. Si ya tenías una status line no la toca y te dice cómo encadenarlas. Para quitarlo, borra la clave `statusLine` de los ajustes de Claude Code.
+
+Los porcentajes son los que reportó cada herramienta la última vez que la usaste; si una ventana ya se reinició, Trayecto la muestra en cero. "Tokens" cuenta entrada nueva, escritura de caché y salida; deja fuera las lecturas de caché, que son enormes y casi gratis. Esta sección solo existe con el servidor local (no en la versión estática).
+
 ## Tus datos
 
 ```
@@ -92,7 +110,7 @@ No hay paso de compilación: HTML, CSS y JavaScript a mano en `web/`, y un servi
 
 ```sh
 node --test pruebas/                      # lógica (avance, completar, revertir)
-python3 -m unittest discover -s pruebas   # servidor
+python3 -m unittest discover -s pruebas   # servidor y lector de uso
 ```
 
 Para capturas o demos, la URL acepta parámetros: `?abierto=1&vista=detalle&p=0&color=%230a84ff&forma=pildora&lado=derecha&tema=claro`.

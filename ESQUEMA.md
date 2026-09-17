@@ -77,4 +77,6 @@ En pantalla se redondea, y nunca se muestra 100 % mientras quede algo pendiente.
 - `GET /api/estado` devuelve `{ version, ajustes, proyectos, finalizadas: { tareas, proyectos } }` con un `ETag`.
 - `PUT /api/estado` lo reemplaza. Requiere el encabezado `X-Trayecto: 1`; con `If-Match` responde `409` si los archivos cambiaron por fuera. Antes de escribir deja una copia `.bak`.
 
+- `GET /api/uso` devuelve el consumo de asistentes de código: `{ generado, herramientas: [{ id, nombre, plan, conectado, visto, limites: [{ id, usado, reinicia }], tokens: { hoy, semana } }] }`. `usado` va de 0 a 100 y `reinicia` es epoch en segundos. Solo lectura; ver `uso.py`.
+
 Por defecto solo escucha en `127.0.0.1` y rechaza peticiones con otro `Host` u `Origin`.
