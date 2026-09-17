@@ -1,281 +1,92 @@
-// Los widgets de Flecha para la pantalla de inicio de iPhone y iPad.
+// Los widgets de Flecha para iPhone y iPad.
 //
-//   Línea    la idea original: solo una línea; la tocas y se abre el cuadro con las
-//            barras, y se vuelve a cerrar sola. Todo ocurre dentro del widget.
-//   Avance   tus proyectos y cuánto llevan, siempre a la vista
+//   Hoy      el porcentaje del día, con botones para sumar a tus rutinas y terminar tareas
+//   Avance   tus proyectos y cuánto llevan
 //   Uso      los límites de Claude, Codex... (necesita conectar la app con tu Mac)
-//
-// iOS no deja que una app dibuje sobre la pantalla de inicio ni que un widget cambie
-// de tamaño: un widget vive en su casilla. Lo más cercano a la línea flotante de la
-// Mac es el widget Línea, que usa un botón interactivo (iOS 17) para abrirse.
 
-import AppIntents
 import SwiftUI
 import WidgetKit
 
 struct Entrada: TimelineEntry {
     let date: Date
-    let filas: [Fila]
-    let apariencia: Apariencia
-    var actualizado: Date? = nil
-    var abierto = true
+    let estado: Estado
+    var uso: Uso? = nil
 }
 
-// MARK: widget Línea
-
-/// Hasta cuándo está abierta la línea. Se guarda en la carpeta compartida.
-enum EstadoLinea {
-    static let duracion: TimeInterval = 30
-    private static let clave = "lineaAbiertaHasta"
-    private static var ajustes: UserDefaults { Almacen.grupo.flatMap { UserDefaults(suiteName: $0) } ?? .standard }
-
-    static var abiertaHasta: Date? {
-        let hasta = Date(timeIntervalSince1970: ajustes.double(forKey: clave))
-        return hasta > Date() ? hasta : nil
+struct Proveedor: TimelineProvider {
+    private func entrada() -> Entrada {
+        Entrada(date: Date(), estado: Estado.leer(Almacen.estadoVigente), uso: Almacen.conexion == nil ? nil : Uso.leer(Almacen.leer(.uso)))
     }
 
-    static func alternar() {
-        ajustes.set(abiertaHasta == nil ? Date().addingTimeInterval(duracion).timeIntervalSince1970 : 0, forKey: clave)
-    }
-}
+    func placeholder(in context: Context) -> Entrada { entrada() }
 
-struct AlternarLinea: AppIntent {
-    static var title: LocalizedStringResource = "Abrir o cerrar la línea"
-    static var isDiscoverable = false
-
-    func perform() async throws -> some IntentResult {
-        EstadoLinea.alternar()
-        return .result()
-    }
-}
-
-struct ProveedorLinea: TimelineProvider {
-    private func entradas() -> [Entrada] {
-        let estado = Estado.leer(Almacen.estadoVigente)
-        let filas = estado.filas.map { Fila(id: $0.id, nombre: $0.nombre, fraccion: $0.fraccion, porcentaje: $0.porcentaje) }
-        let apariencia = Apariencia(estado.ajustes)
-        guard let hasta = EstadoLinea.abiertaHasta else {
-            return [Entrada(date: Date(), filas: filas, apariencia: apariencia, abierto: false)]
-        }
-        // Abierta ahora, y cerrada sola cuando se cumpla el tiempo.
-        return [
-            Entrada(date: Date(), filas: filas, apariencia: apariencia, abierto: true),
-            Entrada(date: hasta, filas: filas, apariencia: apariencia, abierto: false),
-        ]
-    }
-
-    func placeholder(in context: Context) -> Entrada {
-        Entrada(date: Date(), filas: [], apariencia: Apariencia(), abierto: false)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (Entrada) -> Void) {
-        completion(entradas()[0])
-    }
+    func getSnapshot(in context: Context, completion: @escaping (Entrada) -> Void) { completion(entrada()) }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entrada>) -> Void) {
+        // Primero se dibuja lo que hay; la sincronización va por detrás y, si trae algo
+        // distinto, ella misma pide que el widget se vuelva a dibujar.
+        let ahora = Date()
+        let medianoche = Calendar.current.startOfDay(for: ahora.addingTimeInterval(86400))
+        completion(Timeline(entries: [entrada()], policy: .after(min(ahora.addingTimeInterval(20 * 60), medianoche))))
         Task {
-            // Al abrirse no se espera a la red: primero se responde al toque.
-            if EstadoLinea.abiertaHasta == nil { await refrescarDesdeLaMac() }
-            completion(Timeline(entries: entradas(), policy: .after(Date().addingTimeInterval(siguienteVuelta))))
+            await Sincronia.sincronizar()
+            await Sincronia.traerUso()
         }
     }
 }
 
-struct VistaLinea: View {
-    let entrada: Entrada
+private struct Marco<Contenido: View>: View {
+    let destino: String
+    @ViewBuilder var contenido: (Tamano) -> Contenido
 
     @Environment(\.widgetFamily) private var familia
-    @Environment(\.colorScheme) private var esquemaDelSistema
-
-    private var tamano: Tamano {
-        switch familia {
-        case .systemSmall: return .chico
-        case .systemMedium: return .mediano
-        default: return .grande
-        }
-    }
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Button(intent: AlternarLinea()) {
-                ZStack(alignment: .leading) {
-                    Color.clear
-                    if entrada.abierto {
-                        VistaBarras(filas: entrada.filas, apariencia: entrada.apariencia, tamano: tamano)
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.04, anchor: .leading).combined(with: .opacity),
-                                removal: .scale(scale: 0.04, anchor: .leading).combined(with: .opacity)))
-                    } else {
-                        Capsule()
-                            .fill(entrada.apariencia.tinte(0))
-                            .frame(width: 5, height: tamano == .grande ? 96 : 64)
-                            .widgetAccentable()
-                            .transition(.opacity)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if entrada.abierto {
-                // Una salida a la app, porque aquí tocar el cuadro lo cierra.
-                Link(destination: URL(string: "flecha://abrir")!) {
-                    Image(systemName: "arrow.up.forward")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(.quaternary))
-                }
-                .offset(x: 6, y: -6)
-                .transition(.opacity)
-            }
-        }
-        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: entrada.abierto)
-        .environment(\.colorScheme, entrada.apariencia.esquema ?? esquemaDelSistema)
-        .containerBackground(for: .widget) { entrada.apariencia.fondo }
+        let tamano: Tamano = familia == .systemSmall ? .chico : familia == .systemMedium ? .mediano : .grande
+        contenido(tamano)
+            .containerBackground(for: .widget) { Color.fondoFlecha }
+            .widgetURL(URL(string: destino))
     }
 }
 
-struct WidgetLinea: Widget {
+struct WidgetHoy: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "FlechaLinea", provider: ProveedorLinea()) { entrada in
-            VistaLinea(entrada: entrada)
-        }
-        .configurationDisplayName(texto("Línea", "Line"))
-        .description(texto("Una línea. La tocas y se abre en tus proyectos.", "A line. Tap it and it opens into your projects."))
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
-    }
-}
-
-// MARK: widgets siempre abiertos
-
-/// Si la app está conectada con tu Mac, trae lo más nuevo antes de dibujar.
-/// Si la Mac no contesta (estás fuera de casa), se queda con lo último guardado.
-private func refrescarDesdeLaMac() async {
-    guard let conexion = Almacen.conexion else { return }
-    let cliente = Cliente(conexion: conexion)
-    if let nuevo = try? await cliente.estado() { Almacen.escribir(nuevo.datos, en: .mac) }
-    if let uso = try? await cliente.uso() { Almacen.escribir(uso, en: .uso) }
-}
-
-private let siguienteVuelta: TimeInterval = 20 * 60
-
-struct ProveedorAvance: TimelineProvider {
-    private static let muestra = [
-        Fila(id: "1", nombre: texto("Cafetería", "Coffee shop"), fraccion: 0.81, porcentaje: 81),
-        Fila(id: "2", nombre: texto("Disco", "Album"), fraccion: 0.44, porcentaje: 44),
-        Fila(id: "3", nombre: texto("Maratón", "Marathon"), fraccion: 0.71, porcentaje: 71),
-        Fila(id: "4", nombre: texto("Huerto", "Garden"), fraccion: 0.17, porcentaje: 17),
-    ]
-
-    private func entrada() -> Entrada {
-        let estado = Estado.leer(Almacen.estadoVigente)
-        return Entrada(date: Date(), filas: estado.filas, apariencia: Apariencia(estado.ajustes))
-    }
-
-    func placeholder(in context: Context) -> Entrada {
-        Entrada(date: Date(), filas: Self.muestra, apariencia: Apariencia())
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (Entrada) -> Void) {
-        let real = entrada()
-        completion(context.isPreview && real.filas.isEmpty ? placeholder(in: context) : real)
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entrada>) -> Void) {
-        Task {
-            await refrescarDesdeLaMac()
-            completion(Timeline(entries: [entrada()], policy: .after(Date().addingTimeInterval(siguienteVuelta))))
-        }
-    }
-}
-
-struct ProveedorUso: TimelineProvider {
-    private static let muestra = [
-        Fila(id: "1", nombre: "Claude · 5 h", fraccion: 0.64, porcentaje: 64),
-        Fila(id: "2", nombre: "Claude · \(texto("semana", "week"))", fraccion: 0.27, porcentaje: 27),
-        Fila(id: "3", nombre: "Codex · 5 h", fraccion: 0.38, porcentaje: 38),
-        Fila(id: "4", nombre: "Codex · \(texto("semana", "week"))", fraccion: 0.92, porcentaje: 92, alerta: true),
-    ]
-
-    private func entrada() -> Entrada {
-        let estado = Estado.leer(Almacen.estadoVigente)
-        let uso = Almacen.conexion == nil ? nil : Uso.leer(Almacen.leer(.uso))
-        return Entrada(
-            date: Date(),
-            filas: uso?.filas() ?? [],
-            apariencia: Apariencia(estado.ajustes),
-            actualizado: uso.map { Date(timeIntervalSince1970: $0.generado) }
-        )
-    }
-
-    func placeholder(in context: Context) -> Entrada {
-        Entrada(date: Date(), filas: Self.muestra, apariencia: Apariencia())
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (Entrada) -> Void) {
-        let real = entrada()
-        completion(context.isPreview && real.filas.isEmpty ? placeholder(in: context) : real)
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<Entrada>) -> Void) {
-        Task {
-            await refrescarDesdeLaMac()
-            completion(Timeline(entries: [entrada()], policy: .after(Date().addingTimeInterval(siguienteVuelta))))
-        }
-    }
-}
-
-struct VistaWidget: View {
-    let entrada: Entrada
-    var vacio: String? = nil
-    var destino = "flecha://abrir"
-
-    @Environment(\.widgetFamily) private var familia
-    @Environment(\.colorScheme) private var esquemaDelSistema
-
-    private var tamano: Tamano {
-        switch familia {
-        case .systemSmall: return .chico
-        case .systemMedium: return .mediano
-        default: return .grande
-        }
-    }
-
-    var body: some View {
-        Group {
-            if let vacio {
-                VistaBarras(filas: entrada.filas, apariencia: entrada.apariencia, tamano: tamano, vacio: vacio, actualizado: tamano == .chico ? nil : entrada.actualizado)
-            } else {
-                VistaBarras(filas: entrada.filas, apariencia: entrada.apariencia, tamano: tamano)
+        StaticConfiguration(kind: "FlechaHoy", provider: Proveedor()) { entrada in
+            Marco(destino: "flecha://hoy") { tamano in
+                VistaHoy(dia: entrada.estado.resumen(), apariencia: Apariencia(entrada.estado.ajustes), tamano: tamano, proximas: entrada.estado.proximas(dias: 14))
             }
         }
-        .environment(\.colorScheme, entrada.apariencia.esquema ?? esquemaDelSistema)
-        .containerBackground(for: .widget) { entrada.apariencia.fondo }
-        .widgetURL(URL(string: destino))
+        .configurationDisplayName(texto("Hoy", "Today"))
+        .description(texto("El avance de tu día: rutinas y entregas.", "Your day's progress: routines and deadlines."))
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
 struct WidgetAvance: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "FlechaAvance", provider: ProveedorAvance()) { entrada in
-            VistaWidget(entrada: entrada)
+        StaticConfiguration(kind: "FlechaAvance", provider: Proveedor()) { entrada in
+            Marco(destino: "flecha://proyectos") { tamano in
+                VistaBarras(filas: entrada.estado.filas, apariencia: Apariencia(entrada.estado.ajustes), tamano: tamano)
+            }
         }
         .configurationDisplayName(texto("Avance", "Progress"))
         .description(texto("Tus proyectos y cuánto llevan.", "Your projects and how far along they are."))
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
 struct WidgetUso: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "FlechaUso", provider: ProveedorUso()) { entrada in
-            VistaWidget(
-                entrada: entrada,
-                vacio: texto("Conecta Flecha con tu Mac para ver tus límites", "Connect Flecha to your Mac to see your limits"),
-                destino: "flecha://uso"
-            )
+        StaticConfiguration(kind: "FlechaUso", provider: Proveedor()) { entrada in
+            Marco(destino: "flecha://hoy") { tamano in
+                VistaBarras(
+                    filas: entrada.uso?.filas() ?? [],
+                    apariencia: Apariencia(entrada.estado.ajustes),
+                    tamano: tamano,
+                    vacio: texto("Conecta Flecha con tu Mac para ver tus límites", "Connect Flecha to your Mac to see your limits"),
+                    actualizado: tamano == .chico ? nil : entrada.uso.map { Date(timeIntervalSince1970: $0.generado) }
+                )
+            }
         }
         .configurationDisplayName(texto("Uso", "Usage"))
         .description(texto("Los límites de tus asistentes de código.", "Your coding assistants' limits."))
@@ -286,7 +97,7 @@ struct WidgetUso: Widget {
 @main
 struct WidgetsDeFlecha: WidgetBundle {
     var body: some Widget {
-        WidgetLinea()
+        WidgetHoy()
         WidgetAvance()
         WidgetUso()
     }

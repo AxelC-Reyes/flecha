@@ -23,10 +23,6 @@ targets:
     sources:
       - App
       - Compartido
-      # La interfaz es la misma carpeta web/ del repositorio, tal cual.
-      - path: ../web
-        type: folder
-        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(FLECHA_PREFIJO).flecha

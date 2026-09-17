@@ -542,6 +542,30 @@ p.texto-tarea { margin: 0; color: var(--texto2); }
 .quitar:hover { color: var(--texto2); }
 @media (hover: none) { .quitar { display: none; } }
 
+.texto-y-fecha { min-width: 0; }
+.vence { display: block; margin-top: 1px; font-size: 11.5px; line-height: 1.3; color: var(--texto2); }
+.vence.atrasada { color: var(--peligro); }
+.con-fecha { position: relative; display: grid; }
+.fecha-oculta { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+.tarea { grid-template-columns: 22px 1fr auto auto; }
+.tarea .con-fecha { margin-right: -8px; }
+.rutina { grid-template-columns: auto 1fr; }
+.contador {
+  min-width: 34px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1.5px var(--texto3);
+  font: 600 11px/1 var(--fuente-cifras);
+  font-variant-numeric: tabular-nums;
+  color: var(--texto2);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, transform 0.25s var(--curva);
+}
+.contador:active { transform: scale(0.9); }
+.cumplida .contador { background: var(--tinte); box-shadow: none; color: var(--sobre-tinte); }
+.titulo-rutina { color: var(--texto); }
+p.titulo-rutina { color: var(--texto); }
+
 .revertir { color: var(--texto2); margin: -5px -6px -5px 0; }
 
 .pie {

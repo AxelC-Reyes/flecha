@@ -172,3 +172,89 @@ test('el estado sobrevive un viaje por JSON', () => {
   e = L.completarTarea(e, 'libro', 'cap').estado;
   assert.deepEqual(L.normalizar(JSON.parse(JSON.stringify(e))), e);
 });
+
+// ---------- fechas límite y rutinas ----------
+
+function conRutina(extra = {}) {
+  return L.normalizar({
+    proyectos: [{
+      id: 'm', nombre: 'Maestría', tareas: [{ id: 't', titulo: 'Constancia de inglés', vence: '2026-10-01' }],
+      rutinas: [{ id: 'r', titulo: 'Ejercicios', veces: 3, dias: [1, 2, 3, 4, 5], ...extra }],
+    }],
+  });
+}
+
+test('la fecha límite sobrevive, también al finalizar y restaurar', () => {
+  let e = conRutina();
+  assert.equal(e.proyectos[0].tareas[0].vence, '2026-10-01');
+  assert.equal(L.normalizar({ proyectos: [{ nombre: 'X', tareas: [{ titulo: 'a', vence: 'mañana' }] }] }).proyectos[0].tareas[0].vence, undefined);
+  e = L.completarTarea(e, 'm', 't').estado;
+  assert.equal(e.finalizadas.tareas[0].vence, '2026-10-01');
+  e = L.restaurarTarea(e, 't');
+  assert.equal(e.proyectos[0].tareas[0].vence, '2026-10-01');
+  e = L.fijarVence(e, 'm', 't', null);
+  assert.equal('vence' in e.proyectos[0].tareas[0], false);
+});
+
+test('una rutina sin meta no mueve el avance ni deja archivar el proyecto', () => {
+  let e = conRutina();
+  assert.equal(L.porcentaje(e, 'm'), 0);
+  const r = L.completarTarea(e, 'm', 't');
+  assert.equal(r.proyectoFinalizado, false);
+  assert.equal(L.porcentaje(r.estado, 'm'), 100);
+});
+
+test('registrar veces del día, con tope y borrado', () => {
+  let e = conRutina();
+  e = L.registrarRutina(e, 'm', 'r', '2026-09-17', 2).estado;
+  assert.equal(e.proyectos[0].rutinas[0].registro['2026-09-17'], 2);
+  assert.equal(L.cumplida(e.proyectos[0].rutinas[0], '2026-09-17'), false);
+  e = L.registrarRutina(e, 'm', 'r', '2026-09-17', 9).estado;
+  assert.equal(e.proyectos[0].rutinas[0].registro['2026-09-17'], 3);
+  e = L.registrarRutina(e, 'm', 'r', '2026-09-17', 0).estado;
+  assert.deepEqual(e.proyectos[0].rutinas[0].registro, {});
+});
+
+test('la racha salta los días de descanso y no se rompe por el día de hoy', () => {
+  // 2026-09-17 es jueves. Descansa sábado y domingo.
+  let e = conRutina();
+  for (const f of ['2026-09-11', '2026-09-14', '2026-09-15', '2026-09-16']) e = L.registrarRutina(e, 'm', 'r', f, 3).estado;
+  const r = () => e.proyectos[0].rutinas[0];
+  assert.equal(L.diaSemana('2026-09-17'), 4);
+  assert.equal(L.tocaHoy(r(), '2026-09-13'), false);
+  assert.equal(L.racha(r(), '2026-09-17'), 4); // vie, (sáb y dom descanso), lun, mar, mié; hoy aún no
+  e = L.registrarRutina(e, 'm', 'r', '2026-09-17', 3).estado;
+  assert.equal(L.racha(r(), '2026-09-17'), 5);
+  assert.equal(L.racha(r(), '2026-09-18'), 5); // viernes sin hacer todavía: no la rompe
+  e = L.registrarRutina(e, 'm', 'r', '2026-09-18', 3).estado;
+  assert.equal(L.racha(r(), '2026-09-20'), 6); // domingo: el descanso no la rompe
+  assert.equal(L.racha(r(), '2026-09-22'), 0); // faltó el lunes 21
+});
+
+test('con meta, la rutina suma al avance y al cumplirla puede terminar el proyecto', () => {
+  let e = conRutina({ meta: 4 });
+  e = L.registrarRutina(e, 'm', 'r', '2026-09-14', 3).estado;
+  assert.equal(L.avanceRutina(e.proyectos[0].rutinas[0]), 0.25);
+  assert.equal(L.porcentaje(e, 'm'), 13); // 0.25 de 2 unidades
+  e = L.completarTarea(e, 'm', 't').estado;
+  assert.equal(L.estaFinalizado(e, 'm'), false);
+  for (const f of ['2026-09-15', '2026-09-16']) e = L.registrarRutina(e, 'm', 'r', f, 3).estado;
+  const fin = L.registrarRutina(e, 'm', 'r', '2026-09-17', 3);
+  assert.equal(fin.proyectoFinalizado, true);
+  assert.equal(L.estaFinalizado(fin.estado, 'm'), true);
+  // al restaurar la tarea, el proyecto vuelve con su rutina intacta
+  const vuelta = L.restaurarTarea(fin.estado, 't');
+  assert.equal(vuelta.proyectos[0].rutinas[0].registro['2026-09-17'], 3);
+});
+
+test('crear y eliminar rutinas; el estado sigue sobreviviendo a JSON', () => {
+  let e = conRutina();
+  const r = L.crearRutina(e, 'm', { titulo: 'Gimnasio', veces: 1, dias: [1, 3, 5], meta: 100 });
+  assert.equal(r.estado.proyectos[0].rutinas.length, 2);
+  assert.deepEqual(r.estado.proyectos[0].rutinas[1].dias, [1, 3, 5]);
+  assert.equal(L.crearRutina(e, 'm', { titulo: '  ' }).id, null);
+  assert.deepEqual(L.normalizar(JSON.parse(JSON.stringify(r.estado))), r.estado);
+  e = L.eliminarRutina(r.estado, 'm', r.id);
+  e = L.eliminarRutina(e, 'm', 'r');
+  assert.equal('rutinas' in e.proyectos[0], false);
+});

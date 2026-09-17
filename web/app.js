@@ -21,9 +21,6 @@
   const calmado = window.matchMedia('(prefers-reduced-motion: reduce)');
   const puente = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.flecha;
   const nativo = (tipo, extra) => puente && puente.postMessage({ tipo, ...extra });
-  // En iPhone y iPad la app guarda los datos y puede conectarse al servidor de tu Mac.
-  const movil = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.flechaDatos;
-  let conexion = (window.__flechaInicial && window.__flechaInicial.conexion) || { servidor: null, enLinea: false };
 
   let almacen = null;
   let estado = L.estadoVacio();
@@ -63,6 +60,7 @@
     atras: trazo('<path d="m14.5 5.5-6.5 6.5 6.5 6.5"/>', 'stroke-width="2.2"'),
     revertir: trazo('<path d="M8.5 5.5 4.5 9.5l4 4"/><path d="M4.5 9.5h9.2a5.3 5.3 0 0 1 0 10.6H9.5"/>'),
     uso: trazo('<path d="M5.2 17.2a8.3 8.3 0 1 1 13.6 0"/><path d="m12 13.2 3.4-4.4"/><circle cx="12" cy="13.2" r="1.1" fill="currentColor"/>'),
+    calendario: trazo('<rect x="4.5" y="6" width="15" height="13.5" rx="3"/><path d="M4.5 10.5h15M8.5 4v3.5M15.5 4v3.5"/>'),
     equis: trazo('<path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/>', 'stroke-width="2.4"'),
     palomita: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.4 11.4 3.1 3.1 6.1-6.7"/></svg>',
   };
@@ -418,7 +416,7 @@
       h(
         'div',
         { class: 'cuerpo' },
-        h('ul', { class: 'tareas' }, p.tareas.map((tarea) => filaTarea(p, tarea)), nueva),
+        h('ul', { class: 'tareas' }, (p.rutinas || []).map((rutina) => filaRutina(p, rutina)), p.tareas.map((tarea) => filaTarea(p, tarea)), nueva),
       ),
       ajustando && !sinTareas && controlAvance(p),
       h(
@@ -475,14 +473,20 @@
       'li',
       { class: 'tarea' },
       h('button', { class: 'circulo', type: 'button', 'aria-label': t('completar'), html: ICONOS.palomita, onclick: () => completar(p.id, tarea.id, fila) }),
-      campoTarea(tarea.titulo, (valor) => {
-        const limpio = valor.trim();
-        if (limpio === titulo) return;
-        // Dejar el título vacío quita la tarea, como en Recordatorios.
-        confirmar(L.renombrarTarea(estado, p.id, tarea.id, limpio), { recordar: !limpio });
-        if (limpio) titulo = limpio;
-        else pintar();
-      }),
+      h(
+        'div',
+        { class: 'texto-y-fecha' },
+        campoTarea(tarea.titulo, (valor) => {
+          const limpio = valor.trim();
+          if (limpio === titulo) return;
+          // Dejar el título vacío quita la tarea, como en Recordatorios.
+          confirmar(L.renombrarTarea(estado, p.id, tarea.id, limpio), { recordar: !limpio });
+          if (limpio) titulo = limpio;
+          else pintar();
+        }),
+        tarea.vence && h('span', { class: `vence${tarea.vence < L.fechaLocal() ? ' atrasada' : ''}` }, `${t('vence')} ${fechaCorta(tarea.vence)}`),
+      ),
+      selectorDeFecha(p, tarea),
       h('button', {
         class: 'quitar',
         type: 'button',
@@ -496,6 +500,74 @@
       }),
     );
     return fila;
+  }
+
+  const fechaCorta = (fecha) => {
+    const [anio, mes, dia] = fecha.split('-').map(Number);
+    const opciones = { day: 'numeric', month: 'short', ...(anio !== new Date().getFullYear() ? { year: 'numeric' } : {}) };
+    return new Date(anio, mes - 1, dia).toLocaleDateString(undefined, opciones);
+  };
+
+  // Un botón de calendario que abre el selector de fechas del sistema. Vaciarlo quita la fecha.
+  function selectorDeFecha(p, tarea) {
+    const campo = h('input', {
+      type: 'date',
+      class: 'fecha-oculta',
+      value: tarea.vence || '',
+      tabIndex: -1,
+      'aria-hidden': 'true',
+      onchange: (e) => {
+        confirmar(L.fijarVence(estado, p.id, tarea.id, e.target.value || null));
+        pintar();
+      },
+    });
+    return h(
+      'span',
+      { class: 'con-fecha' },
+      h('button', {
+        class: 'quitar',
+        type: 'button',
+        'aria-label': t('fechaLimite'),
+        title: t('fechaLimite'),
+        html: ICONOS.calendario,
+        onclick: () => (campo.showPicker ? campo.showPicker() : campo.focus()),
+      }),
+      campo,
+    );
+  }
+
+  // Una rutina: el contador suma una vez por toque; al llegar al total, otro toque lo regresa a cero.
+  function filaRutina(p, rutina) {
+    const hoy = L.fechaLocal();
+    const hechas = rutina.registro[hoy] || 0;
+    const descansa = !L.tocaHoy(rutina, hoy);
+    const seguidos = L.racha(rutina, hoy);
+    const notas = [
+      descansa ? t('descanso') : null,
+      seguidos > 0 ? `${t('racha')} ${seguidos}` : null,
+      rutina.meta ? `${L.diasCumplidos(rutina)}/${rutina.meta} ${t('dias')}` : null,
+    ].filter(Boolean);
+    return h(
+      'li',
+      { class: `tarea rutina${hechas >= rutina.veces ? ' cumplida' : ''}` },
+      h(
+        'button',
+        {
+          class: 'contador',
+          type: 'button',
+          'aria-label': `${rutina.titulo}: ${hechas}/${rutina.veces}`,
+          onclick: () => {
+            const r = L.registrarRutina(estado, p.id, rutina.id, hoy, hechas >= rutina.veces ? 0 : hechas + 1);
+            confirmar(r.estado, { recordar: true });
+            if (!r.proyectoFinalizado) return pintar();
+            volver();
+            mostrarAviso(t('avisoProyecto'), true);
+          },
+        },
+        `${hechas}/${rutina.veces}`,
+      ),
+      h('div', { class: 'texto-y-fecha' }, h('p', { class: 'texto-tarea titulo-rutina' }, rutina.titulo), notas.length > 0 && h('span', { class: 'vence' }, notas.join(' · '))),
+    );
   }
 
   function completar(proyectoId, tareaId, fila) {
@@ -686,8 +758,6 @@
 
   async function cargarUso() {
     if (!almacen) return;
-    // En la app de iPhone/iPad lo pide la parte nativa (al servidor de tu Mac) y llega por recibirUso.
-    if (almacen.modo === 'nativo') return movil.postMessage({ tipo: 'uso' });
     if (almacen.modo !== 'servidor') return;
     try {
       const r = await fetch('api/uso', { headers: { 'X-Flecha': '1' }, cache: 'no-store' });
@@ -769,46 +839,14 @@
           h(
             'div',
             { class: 'acciones' },
-            !puente && !movil && h('button', { class: 'boton', type: 'button', onclick: exportar }, t('exportar')),
-            !puente && !movil && h('button', { class: 'boton', type: 'button', onclick: importar }, t('importar')),
+            !puente && h('button', { class: 'boton', type: 'button', onclick: exportar }, t('exportar')),
+            !puente && h('button', { class: 'boton', type: 'button', onclick: importar }, t('importar')),
             a.ejemplo && h('button', { class: 'boton', type: 'button', onclick: empezarDeCero }, t('empezarDeCero')),
           ),
-          h('p', { class: 'nota' }, [a.ejemplo && t('notaEjemplo'), t(notaDeDatos())].filter(Boolean).join(' ')),
+          h('p', { class: 'nota' }, [a.ejemplo && t('notaEjemplo'), t(almacen.modo === 'servidor' ? 'notaServidor' : 'notaLocal')].filter(Boolean).join(' ')),
         ),
-        movil &&
-          grupo(
-            t('fondoWidget'),
-            h(
-              'div',
-              { class: 'muestras' },
-              h('button', { class: 'muestra auto', type: 'button', title: t('colorAuto'), 'aria-label': t('colorAuto'), 'aria-pressed': String(!a.fondoWidget), onclick: () => cambiar({ fondoWidget: null }) }),
-              h(
-                'label',
-                { class: 'muestra propio', style: a.fondoWidget ? `--c:${a.fondoWidget}` : null, 'aria-pressed': String(!!a.fondoWidget), title: t('colorPropio') },
-                h('span', { html: ICONOS.mas, style: 'display:grid' }),
-                h('input', { type: 'color', value: a.fondoWidget || '#000000', 'aria-label': t('fondoWidget'), onchange: (e) => cambiar({ fondoWidget: e.target.value }) }),
-              ),
-            ),
-            h('p', { class: 'nota' }, t('notaFondoWidget')),
-          ),
-        movil &&
-          grupo(
-            t('tuMac'),
-            h(
-              'div',
-              { class: 'acciones' },
-              h('button', { class: 'boton', type: 'button', onclick: () => movil.postMessage({ tipo: conexion.servidor ? 'desconectar' : 'conectar' }) }, t(conexion.servidor ? 'desconectar' : 'conectar')),
-            ),
-            h('p', { class: 'nota' }, conexion.servidor ? `${t(conexion.enLinea ? 'macEnLinea' : 'macSinConexion')} ${conexion.servidor}` : t('notaConectar')),
-          ),
       ),
     ];
-  }
-
-  function notaDeDatos() {
-    if (almacen.modo === 'servidor') return 'notaServidor';
-    if (almacen.modo === 'nativo') return conexion.servidor ? 'notaNativaMac' : 'notaNativa';
-    return 'notaLocal';
   }
 
   function empezarDeCero() {
@@ -962,28 +1000,7 @@
     }
   }
 
-  // Llega desde un toque en el widget: flecha://proyecto/<id>
-  function abrirProyecto(id) {
-    if (!estado.proyectos.some((p) => p.id === id)) return abrir();
-    if (abierto) return ir({ nombre: 'detalle', id });
-    vista = { nombre: 'detalle', id };
-    abrir();
-  }
-
   window.Flecha.cerrar = cerrar;
   window.Flecha.abrir = () => abrir();
-  window.Flecha.abrirProyecto = abrirProyecto;
-  window.Flecha.abrirUso = () => {
-    if (!hayUso()) return abrir();
-    if (abierto) return ir({ nombre: 'uso' });
-    vista = { nombre: 'uso' };
-    abrir();
-  };
-  window.Flecha.recibirUso = recibirUso;
-  window.Flecha.recibirConexion = (nueva) => {
-    conexion = nueva || { servidor: null, enLinea: false };
-    if (!conexion.servidor) recibirUso(null);
-    if (abierto && vista.nombre === 'ajustes') pintar();
-  };
   arrancar();
 })();

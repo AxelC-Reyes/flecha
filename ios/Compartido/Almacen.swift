@@ -1,8 +1,10 @@
 // Dónde guarda Flecha sus archivos en iPhone y iPad: la carpeta compartida entre la
 // app y el widget (App Group). Todo es JSON, igual que en la computadora.
 //
-//   local.json      tus datos en este dispositivo
-//   mac.json        lo último que se leyó del servidor de tu Mac, si lo conectaste
+//   local.json      tus datos cuando el teléfono va por su cuenta
+//   mac.json        tu copia de trabajo de los datos de la Mac, si la conectaste
+//   base.json       lo último que la Mac confirmó (mac.json = base.json + cola.json)
+//   cola.json       cambios hechos sin conexión, por entregar
 //   uso.json        lo último de GET /api/uso
 //   conexion.json   dirección y clave del servidor de tu Mac
 
@@ -50,7 +52,7 @@ enum Almacen {
     }()
 
     enum Archivo: String {
-        case local = "local.json", mac = "mac.json", uso = "uso.json", conexion = "conexion.json"
+        case local = "local.json", mac = "mac.json", base = "base.json", cola = "cola.json", uso = "uso.json", conexion = "conexion.json"
     }
 
     static func leer(_ archivo: Archivo) -> Data? {
@@ -80,4 +82,7 @@ enum Almacen {
     static var estadoVigente: Data? {
         conexion != nil ? leer(.mac) : leer(.local)
     }
+
+    /// Preferencias pequeñas compartidas entre la app y el widget.
+    static var preferencias: UserDefaults { grupo.flatMap { UserDefaults(suiteName: $0) } ?? .standard }
 }

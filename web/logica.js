@@ -42,7 +42,67 @@
     if (!t || typeof t !== 'object' || !texto(t.titulo)) return null;
     const tarea = { id: idUnico(t.id, usados), titulo: texto(t.titulo) };
     if (Number.isFinite(t.peso) && t.peso > 0 && t.peso !== 1) tarea.peso = t.peso;
+    if (esFecha(t.vence)) tarea.vence = t.vence;
     return tarea;
+  }
+
+  // Fechas como texto "AAAA-MM-DD", en hora local: una fecha límite es un día, no un instante.
+  const esFecha = (x) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x);
+
+  function fechaLocal(d = new Date()) {
+    const dos = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+  }
+
+  function deFecha(texto) {
+    const [a, m, d] = texto.split('-').map(Number);
+    return new Date(a, m - 1, d);
+  }
+
+  // Día de la semana ISO: 1 = lunes ... 7 = domingo.
+  const diaSemana = (texto) => ((deFecha(texto).getDay() + 6) % 7) + 1;
+
+  // Una rutina es algo que se repite: "3 ejercicios diarios", "gimnasio de lunes a viernes".
+  //   veces     cuántas veces por día cuenta como cumplido
+  //   dias      días de la semana en que toca (los demás son descanso y no rompen la racha)
+  //   meta      opcional: días cumplidos para darla por terminada; con meta, suma al avance del proyecto
+  //   registro  { "AAAA-MM-DD": veces hechas ese día }
+  function normalizarRutina(cruda, usados) {
+    if (!cruda || typeof cruda !== 'object' || !texto(cruda.titulo)) return null;
+    const rutina = { id: idUnico(cruda.id, usados), titulo: texto(cruda.titulo), veces: 1, registro: {} };
+    if (Number.isInteger(cruda.veces) && cruda.veces >= 1) rutina.veces = Math.min(cruda.veces, 99);
+    const dias = Array.isArray(cruda.dias) ? [...new Set(cruda.dias.filter((d) => Number.isInteger(d) && d >= 1 && d <= 7))].sort() : [];
+    if (dias.length && dias.length < 7) rutina.dias = dias;
+    if (Number.isInteger(cruda.meta) && cruda.meta >= 1) rutina.meta = cruda.meta;
+    if (Number.isFinite(cruda.peso) && cruda.peso > 0 && cruda.peso !== 1) rutina.peso = cruda.peso;
+    if (texto(cruda.creado)) rutina.creado = cruda.creado;
+    const registro = cruda.registro && typeof cruda.registro === 'object' ? cruda.registro : {};
+    for (const [fecha, cuenta] of Object.entries(registro)) {
+      if (esFecha(fecha) && Number.isInteger(cuenta) && cuenta > 0) rutina.registro[fecha] = Math.min(cuenta, rutina.veces);
+    }
+    return rutina;
+  }
+
+  const tocaHoy = (rutina, fecha) => !rutina.dias || rutina.dias.includes(diaSemana(fecha));
+  const cumplida = (rutina, fecha) => (rutina.registro[fecha] || 0) >= rutina.veces;
+  const diasCumplidos = (rutina) => Object.keys(rutina.registro).filter((f) => cumplida(rutina, f)).length;
+
+  // De 0 a 1 si tiene meta; null si es una rutina sin fin.
+  const avanceRutina = (rutina) => (rutina.meta ? Math.min(1, diasCumplidos(rutina) / rutina.meta) : null);
+
+  // Días seguidos cumplidos. Los días de descanso no cuentan ni rompen; hoy no rompe si aún no lo haces.
+  function racha(rutina, hoy = fechaLocal()) {
+    let seguidos = 0;
+    const dia = deFecha(hoy);
+    for (let i = 0; i < 3660; i++) {
+      const fecha = fechaLocal(dia);
+      if (tocaHoy(rutina, fecha)) {
+        if (cumplida(rutina, fecha)) seguidos++;
+        else if (fecha !== hoy) break;
+      }
+      dia.setDate(dia.getDate() - 1);
+    }
+    return seguidos;
   }
 
   function idUnico(id, usados) {
@@ -63,13 +123,12 @@
     if (FORMAS.includes(a.forma)) estado.ajustes.forma = a.forma;
     if (LADOS.includes(a.lado)) estado.ajustes.lado = a.lado;
     if (TEMAS.includes(a.tema)) estado.ajustes.tema = a.tema;
-    // Solo lo usan los widgets de iPhone/iPad: un color de fondo igual al de tu fondo de pantalla.
-    if (/^#[0-9a-f]{6}$/i.test(a.fondoWidget || '')) estado.ajustes.fondoWidget = a.fondoWidget.toLowerCase();
     if (a.ejemplo === true) estado.ajustes.ejemplo = true;
     if (a.iniciado === true) estado.ajustes.iniciado = true;
 
     const idsProyecto = new Set();
     const idsTarea = new Set();
+    const idsRutina = new Set();
     const proyecto = (p) => {
       if (!p || typeof p !== 'object' || !texto(p.nombre)) return null;
       const limpio = { id: idUnico(p.id, idsProyecto), nombre: texto(p.nombre), previo: numero(p.previo, 0), tareas: [] };
@@ -78,6 +137,8 @@
         const tarea = normalizarTarea(t, idsTarea);
         if (tarea) limpio.tareas.push(tarea);
       }
+      const rutinas = (Array.isArray(p.rutinas) ? p.rutinas : []).map((r) => normalizarRutina(r, idsRutina)).filter(Boolean);
+      if (rutinas.length) limpio.rutinas = rutinas;
       return limpio;
     };
 
@@ -112,8 +173,16 @@
     const hecho = estado.finalizadas.tareas
       .filter((t) => t.proyectoId === proyectoId)
       .reduce((s, t) => s + peso(t), 0);
-    const pendiente = p.tareas.reduce((s, t) => s + peso(t), 0);
-    return { hecho: hecho + (p.previo || 0), pendiente };
+    let pendiente = p.tareas.reduce((s, t) => s + peso(t), 0);
+    let deRutinas = 0;
+    // Una rutina con meta pesa como una tarea (o su `peso`) que se va llenando poco a poco.
+    for (const r of p.rutinas || []) {
+      const f = avanceRutina(r);
+      if (f === null) continue;
+      deRutinas += peso(r) * f;
+      pendiente += peso(r) * (1 - f);
+    }
+    return { hecho: hecho + deRutinas + (p.previo || 0), pendiente };
   }
 
   // Fracción de 0 a 1.
@@ -127,7 +196,7 @@
   function porcentaje(estado, proyectoId) {
     const { pendiente } = pesos(estado, proyectoId);
     const pct = Math.round(avance(estado, proyectoId) * 100);
-    return pendiente > 0 ? Math.min(pct, 99) : pct;
+    return pendiente > 1e-9 ? Math.min(pct, 99) : pct;
   }
 
   function buscarProyecto(estado, id) {
@@ -232,11 +301,60 @@
     const [tarea] = p.tareas.splice(i, 1);
     const fin = ahora.toISOString();
     nuevo.finalizadas.tareas.push({ ...tarea, proyectoId, fin });
-    const proyectoFinalizado = p.tareas.length === 0;
-    if (proyectoFinalizado) {
-      nuevo.proyectos = nuevo.proyectos.filter((x) => x.id !== proyectoId);
-      nuevo.finalizadas.proyectos.push({ ...p, fin });
-    }
+    const proyectoFinalizado = sinPendientes(p);
+    if (proyectoFinalizado) archivarProyecto(nuevo, p, fin);
+    return { estado: nuevo, proyectoFinalizado };
+  }
+
+  // Un proyecto con una rutina sin meta nunca se da por terminado solo: la rutina sigue viva.
+  const sinPendientes = (p) => p.tareas.length === 0 && (p.rutinas || []).every((r) => avanceRutina(r) === 1);
+
+  function archivarProyecto(estado, p, fin) {
+    estado.proyectos = estado.proyectos.filter((x) => x.id !== p.id);
+    estado.finalizadas.proyectos.push({ ...p, fin });
+  }
+
+  function fijarVence(estado, proyectoId, tareaId, fecha) {
+    const nuevo = copia(estado);
+    const t = nuevo.proyectos.find((p) => p.id === proyectoId)?.tareas.find((x) => x.id === tareaId);
+    if (!t) return estado;
+    if (esFecha(fecha)) t.vence = fecha;
+    else delete t.vence;
+    return nuevo;
+  }
+
+  // ---------- rutinas ----------
+
+  function crearRutina(estado, proyectoId, datos, ahora = new Date()) {
+    const nuevo = copia(estado);
+    const p = nuevo.proyectos.find((x) => x.id === proyectoId);
+    const rutina = p && normalizarRutina({ ...datos, id: nuevoId(), registro: {}, creado: ahora.toISOString() }, new Set());
+    if (!rutina) return { estado, id: null };
+    p.rutinas = [...(p.rutinas || []), rutina];
+    return { estado: nuevo, id: rutina.id };
+  }
+
+  function eliminarRutina(estado, proyectoId, rutinaId) {
+    const nuevo = copia(estado);
+    const p = nuevo.proyectos.find((x) => x.id === proyectoId);
+    if (!p || !p.rutinas) return estado;
+    p.rutinas = p.rutinas.filter((r) => r.id !== rutinaId);
+    if (!p.rutinas.length) delete p.rutinas;
+    return nuevo;
+  }
+
+  // Deja en `cuenta` las veces hechas ese día (0 lo borra). Si con eso se cumple la meta y
+  // no queda nada más pendiente, el proyecto se archiva igual que al terminar su última tarea.
+  function registrarRutina(estado, proyectoId, rutinaId, fecha, cuenta, ahora = new Date()) {
+    const nuevo = copia(estado);
+    const p = nuevo.proyectos.find((x) => x.id === proyectoId);
+    const r = p && (p.rutinas || []).find((x) => x.id === rutinaId);
+    if (!r || !esFecha(fecha)) return { estado, proyectoFinalizado: false };
+    const limpia = Math.max(0, Math.min(r.veces, Math.round(cuenta) || 0));
+    if (limpia > 0) r.registro[fecha] = limpia;
+    else delete r.registro[fecha];
+    const proyectoFinalizado = sinPendientes(p) && pesos(nuevo, proyectoId).hecho > 0;
+    if (proyectoFinalizado) archivarProyecto(nuevo, p, ahora.toISOString());
     return { estado: nuevo, proyectoFinalizado };
   }
 
@@ -300,7 +418,7 @@
       .sort((a, b) => reciente(b.tareas).localeCompare(reciente(a.tareas)));
   }
 
-  const api = { VERSION, AJUSTES_BASE, nuevoId, estadoVacio, normalizar, pesos, avance, porcentaje, buscarProyecto, estaFinalizado, crearProyecto, renombrarProyecto, eliminarProyecto, moverProyecto, ajustarAvance, crearTarea, renombrarTarea, eliminarTarea, completarTarea, restaurarTarea, restaurarProyecto, cambiarAjustes, finalizadasPorProyecto };
+  const api = { VERSION, AJUSTES_BASE, fechaLocal, diaSemana, tocaHoy, cumplida, diasCumplidos, avanceRutina, racha, fijarVence, crearRutina, eliminarRutina, registrarRutina, nuevoId, estadoVacio, normalizar, pesos, avance, porcentaje, buscarProyecto, estaFinalizado, crearProyecto, renombrarProyecto, eliminarProyecto, moverProyecto, ajustarAvance, crearTarea, renombrarTarea, eliminarTarea, completarTarea, restaurarTarea, restaurarProyecto, cambiarAjustes, finalizadasPorProyecto };
   raiz.Flecha = Object.assign(raiz.Flecha || {}, { logica: api });
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

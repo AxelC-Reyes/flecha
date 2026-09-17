@@ -45,18 +45,25 @@ Compila `mac/build/Flecha.app` (unos segundos; requiere `xcode-select --install`
 
 ### 3. App y widgets para iPhone y iPad
 
-![Widgets de Avance y Uso en sus tres tamaños](capturas/widgets-ios.png)
+![La app en Hoy y Calendario, y los widgets Hoy y Avance](capturas/ios.png)
 
-Necesitas una Mac con Xcode y una cuenta de Apple (la gratuita sirve; con ella la app hay que reinstalarla cada 7 días).
+En el teléfono Flecha no es una línea (iOS no deja que una app flote sobre la pantalla de inicio): es una app de deberes con los mismos proyectos y los mismos porcentajes.
+
+- **Hoy**: el porcentaje de tu día, tus rutinas, lo que vence hoy, lo atrasado y lo que viene en la semana.
+- **Proyectos**: cada uno con su barra; dentro, sus faltantes (con fecha límite opcional) y sus rutinas.
+- **Calendario**: los días con entregas y los días en que cumpliste tus rutinas.
+- **Rutinas**: cosas que se repiten, como "3 ejercicios diarios" o "gimnasio lunes, miércoles y viernes". Eliges cuántas veces al día, qué días tocan (los de descanso no rompen la racha) y, si quieres, una meta de días: con meta, cada día cumplido suma al avance del proyecto.
+- **Widgets**: *Hoy* (con botones para sumar a una rutina o terminar una tarea sin abrir la app), *Avance* y *Uso*.
+
+Para instalarla necesitas una Mac con Xcode y una cuenta de Apple (la gratuita sirve; con ella hay que reinstalar cada 7 días):
 
 1. Abre `ios/Flecha.xcodeproj` en Xcode.
 2. Crea `ios/Firma.local.xcconfig` con un prefijo tuyo y tu equipo (está explicado en `ios/Firma.xcconfig`), o elige tu equipo en *Signing & Capabilities* de los dos targets.
-3. Conecta tu iPhone o iPad, elígelo arriba y pulsa ▶.
-4. En la pantalla de inicio: mantén presionado → **＋** → Flecha. Hay dos widgets, **Avance** y **Uso**, en tamaño chico, mediano y grande.
+3. Conecta tu iPhone o iPad (con el Modo de desarrollador activo), elígelo arriba y pulsa ▶.
 
-La app es la misma interfaz de siempre, y guarda sus datos en el dispositivo. Los widgets del sistema no pueden animarse, así que muestran el cuadro ya abierto; tocar un proyecto abre la app en sus faltantes.
+**Los mismos datos que en tu computadora**: en la computadora corre `./flecha --red` y copia el enlace que imprime (en la app de Mac: menú *Compartir con mi iPhone o iPad*). En el teléfono: engrane → pega el enlace → Conectar. Deben estar en la misma red wifi. Fuera de casa puedes seguir palomeando: los cambios se guardan en una cola y se entregan, sin pisar lo que haya cambiado la computadora, cuando vuelves a su red. El enlace lleva una clave (`~/.flecha/clave`; bórrala para generar otra). Sin conectar, la app lleva sus propios datos en el teléfono.
 
-**Ver en el teléfono los proyectos de tu computadora** (y el widget de Uso): en la computadora corre `./flecha --red` y copia el enlace que imprime; en la app de Mac es el menú *Compartir con mi iPhone o iPad*, que lo copia por ti. En el teléfono: *Personalizar → Conectar con mi Mac* y pega el enlace. Deben estar en la misma red wifi; fuera de casa verás lo último que se sincronizó. El enlace lleva una clave: sin ella nadie más en tu red puede entrar (se guarda en `~/.flecha/clave`; bórrala para generar otra).
+En la computadora las fechas límite y las rutinas también se ven y se registran (el contador `2/3` dentro de cada proyecto); crear rutinas, por ahora, solo desde el teléfono.
 
 ### 4. Sin instalar nada (teléfono incluido)
 
@@ -115,14 +122,14 @@ El avance de un proyecto es `hecho / (hecho + pendiente)`, contando tareas (o su
 | Plataforma | Hoy | Falta |
 | --- | --- | --- |
 | macOS | Widget flotante nativo (panel de cristal en macOS 26, desenfoque clásico en versiones anteriores) + web | Atajo de teclado global |
-| iPhone / iPad | App nativa + widgets de Avance y Uso (`ios/`) | Marcar tareas desde el widget; sincronizar por iCloud en vez de la red local |
+| iPhone / iPad | App de deberes nativa + widgets Hoy, Avance y Uso (`ios/`) | Avisos de fechas límite; sincronizar por iCloud en vez de la red local; crear rutinas desde la computadora |
 | Android | Web app en pantalla de inicio | Widget de inicio (Glance) |
 | Windows | Web, ventana con `--ventana` | Widget del panel de Windows 11 vía PWA |
 | Linux | Web, ventana con `--ventana` | Applet de bandeja o plasmoide. Se aceptan manos |
 
 ## Desarrollo
 
-No hay paso de compilación: HTML, CSS y JavaScript a mano en `web/`, y un servidor de un solo archivo con la biblioteca estándar de Python. Las apps de Mac (`mac/`) e iOS (`ios/`) son cascarones nativos que muestran esa misma carpeta `web/`. El proyecto de Xcode se regenera con `xcodegen` dentro de `ios/` si cambias `project.yml`.
+No hay paso de compilación: HTML, CSS y JavaScript a mano en `web/`, y un servidor de un solo archivo con la biblioteca estándar de Python. La app de Mac (`mac/`) es un cascarón nativo que muestra esa misma carpeta `web/`; la de iOS (`ios/`) es SwiftUI y comparte con la web el formato de datos y las reglas de cálculo (`web/logica.js` ↔ `ios/Compartido/`). El proyecto de Xcode se regenera con `xcodegen` dentro de `ios/` si cambias `project.yml`.
 
 ```sh
 node --test pruebas/                      # lógica (avance, completar, revertir)

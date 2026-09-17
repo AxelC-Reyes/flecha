@@ -40,8 +40,30 @@ Flecha guarda todo en dos archivos JSON (por defecto en `~/.flecha/`). Puedes es
 | `proyectos[].previo` | número ≥ 0 | trabajo hecho antes de llevarlo en Flecha, en unidades de tarea. Es lo que mueve *Ajustar avance* |
 | `proyectos[].tareas[]` | objeto o texto | los faltantes. Un texto simple equivale a `{ "titulo": ... }` |
 | `tareas[].peso` | número > 0 | opcional, 1 por defecto. Una tarea de peso 3 cuenta como tres |
+| `tareas[].vence` | `"AAAA-MM-DD"` | opcional: fecha límite, en hora local |
+| `proyectos[].rutinas[]` | objeto | opcional: cosas que se repiten (ver abajo) |
 
 El orden de `proyectos` es el orden en pantalla.
+
+### Rutinas
+
+```json
+{
+  "id": "r1",
+  "titulo": "Ejercicios diarios",
+  "veces": 3,
+  "dias": [1, 2, 3, 4, 5],
+  "meta": 120,
+  "registro": { "2026-09-16": 3, "2026-09-17": 2 }
+}
+```
+
+| Campo | Notas |
+| --- | --- |
+| `veces` | cuántas veces por día cuenta como cumplido (1 por defecto) |
+| `dias` | días de la semana en que toca, 1 = lunes … 7 = domingo. Si falta, todos. Los demás son descanso: no cuentan ni rompen la racha |
+| `meta` | opcional: días cumplidos para darla por terminada. Con meta, la rutina suma al avance del proyecto como una tarea (o su `peso`) que se llena poco a poco. Sin meta no mueve el avance y el proyecto nunca se archiva solo |
+| `registro` | veces hechas por fecha. La racha son los días seguidos cumplidos hasta hoy; el día de hoy no la rompe si aún no lo haces |
 
 ## `finalizadas.json`: el archivo
 
@@ -63,8 +85,8 @@ El orden de `proyectos` es el orden en pantalla.
 ## Cómo se calcula el avance
 
 ```
-hecho     = previo + suma de pesos de sus tareas en finalizadas.json
-pendiente = suma de pesos de sus tareas en flecha.json
+hecho     = previo + pesos de sus tareas en finalizadas.json + peso × (días cumplidos / meta) de cada rutina con meta
+pendiente = pesos de sus tareas en flecha.json + lo que le falta a cada rutina con meta
 avance    = hecho / (hecho + pendiente)
 ```
 
