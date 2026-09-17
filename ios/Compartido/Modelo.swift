@@ -55,6 +55,7 @@ struct TareaFinalizada: Decodable {
 struct Ajustes: Decodable {
     var color = "auto" // "auto" | "multicolor" | "#rrggbb"
     var forma = "redondeada" // "redondeada" | "pildora" | "fina"
+    var fondoWidget: String? // "#rrggbb": para igualar el fondo de pantalla
 
     init() {}
 
@@ -62,9 +63,10 @@ struct Ajustes: Decodable {
         let caja = try decoder.container(keyedBy: Claves.self)
         color = (try? caja.decode(String.self, forKey: .color)) ?? "auto"
         forma = (try? caja.decode(String.self, forKey: .forma)) ?? "redondeada"
+        fondoWidget = try? caja.decode(String.self, forKey: .fondoWidget)
     }
 
-    private enum Claves: String, CodingKey { case color, forma }
+    private enum Claves: String, CodingKey { case color, forma, fondoWidget }
 }
 
 struct Estado: Decodable {

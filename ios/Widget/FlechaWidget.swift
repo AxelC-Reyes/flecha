@@ -85,6 +85,7 @@ struct VistaLinea: View {
     let entrada: Entrada
 
     @Environment(\.widgetFamily) private var familia
+    @Environment(\.colorScheme) private var esquemaDelSistema
 
     private var tamano: Tamano {
         switch familia {
@@ -131,7 +132,8 @@ struct VistaLinea: View {
             }
         }
         .animation(.spring(response: 0.5, dampingFraction: 0.82), value: entrada.abierto)
-        .containerBackground(for: .widget) { Color.fondoFlecha }
+        .environment(\.colorScheme, entrada.apariencia.esquema ?? esquemaDelSistema)
+        .containerBackground(for: .widget) { entrada.apariencia.fondo }
     }
 }
 
@@ -231,6 +233,7 @@ struct VistaWidget: View {
     var destino = "flecha://abrir"
 
     @Environment(\.widgetFamily) private var familia
+    @Environment(\.colorScheme) private var esquemaDelSistema
 
     private var tamano: Tamano {
         switch familia {
@@ -248,7 +251,8 @@ struct VistaWidget: View {
                 VistaBarras(filas: entrada.filas, apariencia: entrada.apariencia, tamano: tamano)
             }
         }
-        .containerBackground(for: .widget) { Color.fondoFlecha }
+        .environment(\.colorScheme, entrada.apariencia.esquema ?? esquemaDelSistema)
+        .containerBackground(for: .widget) { entrada.apariencia.fondo }
         .widgetURL(URL(string: destino))
     }
 }

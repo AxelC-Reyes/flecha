@@ -63,6 +63,8 @@
     if (FORMAS.includes(a.forma)) estado.ajustes.forma = a.forma;
     if (LADOS.includes(a.lado)) estado.ajustes.lado = a.lado;
     if (TEMAS.includes(a.tema)) estado.ajustes.tema = a.tema;
+    // Solo lo usan los widgets de iPhone/iPad: un color de fondo igual al de tu fondo de pantalla.
+    if (/^#[0-9a-f]{6}$/i.test(a.fondoWidget || '')) estado.ajustes.fondoWidget = a.fondoWidget.toLowerCase();
     if (a.ejemplo === true) estado.ajustes.ejemplo = true;
     if (a.iniciado === true) estado.ajustes.iniciado = true;
 

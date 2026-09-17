@@ -20,6 +20,7 @@ enum Tamano {
 struct Apariencia {
     var color = "auto"
     var forma = "redondeada"
+    var fondoWidget: String?
 
     static let paleta = ["#ff453a", "#ff9f0a", "#ffd60a", "#30d158", "#63e6e2", "#64d2ff", "#0a84ff", "#5e5ce6", "#bf5af2", "#ff375f"]
 
@@ -28,6 +29,17 @@ struct Apariencia {
     init(_ ajustes: Ajustes) {
         color = ajustes.color
         forma = ajustes.forma
+        fondoWidget = ajustes.fondoWidget
+    }
+
+    /// El fondo del widget: el color que elegiste, o el negro/gris de siempre.
+    var fondo: Color { fondoWidget.flatMap { Color(hex: $0) } ?? .fondoFlecha }
+
+    /// Con fondo propio, las letras se deciden por lo claro u oscuro de ese color.
+    var esquema: ColorScheme? {
+        guard let hex = fondoWidget, hex.count == 7, let valor = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        let luz = 0.2126 * Double((valor >> 16) & 255) + 0.7152 * Double((valor >> 8) & 255) + 0.0722 * Double(valor & 255)
+        return luz > 140 ? .light : .dark
     }
 
     func tinte(_ posicion: Int) -> Color {

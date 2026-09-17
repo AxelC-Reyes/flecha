@@ -777,6 +777,22 @@
         ),
         movil &&
           grupo(
+            t('fondoWidget'),
+            h(
+              'div',
+              { class: 'muestras' },
+              h('button', { class: 'muestra auto', type: 'button', title: t('colorAuto'), 'aria-label': t('colorAuto'), 'aria-pressed': String(!a.fondoWidget), onclick: () => cambiar({ fondoWidget: null }) }),
+              h(
+                'label',
+                { class: 'muestra propio', style: a.fondoWidget ? `--c:${a.fondoWidget}` : null, 'aria-pressed': String(!!a.fondoWidget), title: t('colorPropio') },
+                h('span', { html: ICONOS.mas, style: 'display:grid' }),
+                h('input', { type: 'color', value: a.fondoWidget || '#000000', 'aria-label': t('fondoWidget'), onchange: (e) => cambiar({ fondoWidget: e.target.value }) }),
+              ),
+            ),
+            h('p', { class: 'nota' }, t('notaFondoWidget')),
+          ),
+        movil &&
+          grupo(
             t('tuMac'),
             h(
               'div',
