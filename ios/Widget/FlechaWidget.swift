@@ -1,11 +1,15 @@
 // Los widgets de Flecha para la pantalla de inicio de iPhone y iPad.
 //
-//   Avance   tus proyectos y cuánto llevan
+//   Línea    la idea original: solo una línea; la tocas y se abre el cuadro con las
+//            barras, y se vuelve a cerrar sola. Todo ocurre dentro del widget.
+//   Avance   tus proyectos y cuánto llevan, siempre a la vista
 //   Uso      los límites de Claude, Codex... (necesita conectar la app con tu Mac)
 //
-// Los widgets del sistema son estáticos: no pueden hacer la animación de la línea
-// que se abre. Muestran el cuadro ya abierto; al tocarlos se abre la app.
+// iOS no deja que una app dibuje sobre la pantalla de inicio ni que un widget cambie
+// de tamaño: un widget vive en su casilla. Lo más cercano a la línea flotante de la
+// Mac es el widget Línea, que usa un botón interactivo (iOS 17) para abrirse.
 
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -14,7 +18,135 @@ struct Entrada: TimelineEntry {
     let filas: [Fila]
     let apariencia: Apariencia
     var actualizado: Date? = nil
+    var abierto = true
 }
+
+// MARK: widget Línea
+
+/// Hasta cuándo está abierta la línea. Se guarda en la carpeta compartida.
+enum EstadoLinea {
+    static let duracion: TimeInterval = 30
+    private static let clave = "lineaAbiertaHasta"
+    private static var ajustes: UserDefaults { Almacen.grupo.flatMap { UserDefaults(suiteName: $0) } ?? .standard }
+
+    static var abiertaHasta: Date? {
+        let hasta = Date(timeIntervalSince1970: ajustes.double(forKey: clave))
+        return hasta > Date() ? hasta : nil
+    }
+
+    static func alternar() {
+        ajustes.set(abiertaHasta == nil ? Date().addingTimeInterval(duracion).timeIntervalSince1970 : 0, forKey: clave)
+    }
+}
+
+struct AlternarLinea: AppIntent {
+    static var title: LocalizedStringResource = "Abrir o cerrar la línea"
+    static var isDiscoverable = false
+
+    func perform() async throws -> some IntentResult {
+        EstadoLinea.alternar()
+        return .result()
+    }
+}
+
+struct ProveedorLinea: TimelineProvider {
+    private func entradas() -> [Entrada] {
+        let estado = Estado.leer(Almacen.estadoVigente)
+        let filas = estado.filas.map { Fila(id: $0.id, nombre: $0.nombre, fraccion: $0.fraccion, porcentaje: $0.porcentaje) }
+        let apariencia = Apariencia(estado.ajustes)
+        guard let hasta = EstadoLinea.abiertaHasta else {
+            return [Entrada(date: Date(), filas: filas, apariencia: apariencia, abierto: false)]
+        }
+        // Abierta ahora, y cerrada sola cuando se cumpla el tiempo.
+        return [
+            Entrada(date: Date(), filas: filas, apariencia: apariencia, abierto: true),
+            Entrada(date: hasta, filas: filas, apariencia: apariencia, abierto: false),
+        ]
+    }
+
+    func placeholder(in context: Context) -> Entrada {
+        Entrada(date: Date(), filas: [], apariencia: Apariencia(), abierto: false)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (Entrada) -> Void) {
+        completion(entradas()[0])
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<Entrada>) -> Void) {
+        Task {
+            // Al abrirse no se espera a la red: primero se responde al toque.
+            if EstadoLinea.abiertaHasta == nil { await refrescarDesdeLaMac() }
+            completion(Timeline(entries: entradas(), policy: .after(Date().addingTimeInterval(siguienteVuelta))))
+        }
+    }
+}
+
+struct VistaLinea: View {
+    let entrada: Entrada
+
+    @Environment(\.widgetFamily) private var familia
+
+    private var tamano: Tamano {
+        switch familia {
+        case .systemSmall: return .chico
+        case .systemMedium: return .mediano
+        default: return .grande
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Button(intent: AlternarLinea()) {
+                ZStack(alignment: .leading) {
+                    Color.clear
+                    if entrada.abierto {
+                        VistaBarras(filas: entrada.filas, apariencia: entrada.apariencia, tamano: tamano)
+                            .transition(.asymmetric(
+                                insertion: .scale(scale: 0.04, anchor: .leading).combined(with: .opacity),
+                                removal: .scale(scale: 0.04, anchor: .leading).combined(with: .opacity)))
+                    } else {
+                        Capsule()
+                            .fill(entrada.apariencia.tinte(0))
+                            .frame(width: 5, height: tamano == .grande ? 96 : 64)
+                            .widgetAccentable()
+                            .transition(.opacity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if entrada.abierto {
+                // Una salida a la app, porque aquí tocar el cuadro lo cierra.
+                Link(destination: URL(string: "flecha://abrir")!) {
+                    Image(systemName: "arrow.up.forward")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(.quaternary))
+                }
+                .offset(x: 6, y: -6)
+                .transition(.opacity)
+            }
+        }
+        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: entrada.abierto)
+        .containerBackground(for: .widget) { Color.fondoFlecha }
+    }
+}
+
+struct WidgetLinea: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "FlechaLinea", provider: ProveedorLinea()) { entrada in
+            VistaLinea(entrada: entrada)
+        }
+        .configurationDisplayName(texto("Línea", "Line"))
+        .description(texto("Una línea. La tocas y se abre en tus proyectos.", "A line. Tap it and it opens into your projects."))
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
+// MARK: widgets siempre abiertos
 
 /// Si la app está conectada con tu Mac, trae lo más nuevo antes de dibujar.
 /// Si la Mac no contesta (estás fuera de casa), se queda con lo último guardado.
@@ -150,6 +282,7 @@ struct WidgetUso: Widget {
 @main
 struct WidgetsDeFlecha: WidgetBundle {
     var body: some Widget {
+        WidgetLinea()
         WidgetAvance()
         WidgetUso()
     }
