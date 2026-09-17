@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Trayecto</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Tus proyectos y su avance, en una línea.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Trayecto">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="iconos/icono.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="iconos/icono-180.png">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <main class="escena" id="escena">
+    <div class="widget" id="widget" data-vista="lista">
+      <div class="cima" id="cima" aria-hidden="true"></div>
+      <div class="fila">
+        <button class="asa" id="asa" type="button"></button>
+        <section class="nucleo" id="nucleo">
+          <div class="contenido" id="contenido"></div>
+        </section>
+        <div class="barras" id="barras" aria-hidden="true"></div>
+      </div>
+    </div>
+  </main>
+  <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
+  <noscript>Trayecto necesita JavaScript.</noscript>
+  <!-- Scripts clásicos (sin módulos) para que también funcione abriendo este archivo con doble clic. -->
+  <script defer src="logica.js"></script>
+  <script defer src="textos.js"></script>
+  <script defer src="ejemplo.js"></script>
+  <script defer src="almacen.js"></script>
+  <script defer src="app.js"></script>
+</body>
+</html>

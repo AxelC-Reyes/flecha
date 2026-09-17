@@ -1,0 +1,13 @@
+#!/bin/sh
+# Arranca Trayecto en esta computadora y lo abre en tu navegador.
+#   ./trayecto             solo para ti (127.0.0.1)
+#   ./trayecto --red       también para tu teléfono, en la misma red wifi
+#   ./trayecto --ventana   ventana sin barras (Chrome, Edge o Brave)
+#   ./trayecto --help      todas las opciones
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+for py in python3 python; do
+  if command -v "$py" >/dev/null 2>&1; then exec "$py" "$AQUI/servidor.py" "$@"; fi
+done
+echo "Trayecto necesita Python 3 (https://www.python.org/downloads/)." >&2
+echo "Sin Python también funciona: abre web/index.html con doble clic." >&2
+exit 1

@@ -1,0 +1,12 @@
+# compilados
+mac/build/
+__pycache__/
+*.pyc
+
+# tus datos nunca van al repositorio (por defecto viven en ~/.trayecto)
+/trayecto.json
+/finalizadas.json
+*.bak
+datos/
+
+.DS_Store
