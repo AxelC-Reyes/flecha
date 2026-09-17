@@ -1,4 +1,4 @@
-// Lógica pura de Trayecto: sin DOM ni red, para poder probarla con `node --test`.
+// Lógica pura de Flecha: sin DOM ni red, para poder probarla con `node --test`.
 // Es un script clásico (no módulo) para que index.html también abra con doble clic.
 // Todas las funciones que cambian el estado devuelven una copia nueva.
 
@@ -176,7 +176,7 @@
   }
 
   // Fija el avance visible de un proyecto ajustando `previo`: el trabajo hecho
-  // antes de empezar a llevarlo en Trayecto, medido en unidades de tarea.
+  // antes de empezar a llevarlo en Flecha, medido en unidades de tarea.
   // No puede bajar de lo que ya suman las tareas finalizadas.
   function ajustarAvance(estado, id, objetivoPct) {
     const nuevo = copia(estado);
@@ -299,6 +299,6 @@
   }
 
   const api = { VERSION, AJUSTES_BASE, nuevoId, estadoVacio, normalizar, pesos, avance, porcentaje, buscarProyecto, estaFinalizado, crearProyecto, renombrarProyecto, eliminarProyecto, moverProyecto, ajustarAvance, crearTarea, renombrarTarea, eliminarTarea, completarTarea, restaurarTarea, restaurarProyecto, cambiarAjustes, finalizadasPorProyecto };
-  raiz.Trayecto = Object.assign(raiz.Trayecto || {}, { logica: api });
+  raiz.Flecha = Object.assign(raiz.Flecha || {}, { logica: api });
   if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

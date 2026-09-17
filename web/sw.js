@@ -1,7 +1,7 @@
-// Deja usar Trayecto sin conexión cuando está publicado como página estática.
+// Deja usar Flecha sin conexión cuando está publicado como página estática.
 // Estrategia: responde desde caché y se actualiza por detrás.
 
-const CACHE = 'trayecto-v1';
+const CACHE = 'flecha-v1';
 const ARCHIVOS = ['./', 'index.html', 'estilo.css', 'logica.js', 'textos.js', 'ejemplo.js', 'almacen.js', 'app.js', 'manifest.webmanifest', 'iconos/icono.svg', 'iconos/icono-180.png'];
 
 self.addEventListener('install', (e) => {

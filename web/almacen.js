@@ -5,10 +5,10 @@
 (function (raiz) {
   'use strict';
 
-  const L = raiz.Trayecto.logica;
-  const CLAVE = 'trayecto.v1';
+  const L = raiz.Flecha.logica;
+  const CLAVE = 'flecha.v1';
   const RUTA = 'api/estado';
-  const ENCABEZADOS = { 'X-Trayecto': '1' };
+  const ENCABEZADOS = { 'X-Flecha': '1' };
   const SONDEO_MS = 4000;
   const ESPERA_MS = 250;
 
@@ -18,7 +18,7 @@
   // La primera vez se muestran proyectos de ejemplo. No se guardan hasta que cambies algo.
   function conEjemplo(estado) {
     if (!sinDatos(estado)) return estado;
-    const ejemplo = L.normalizar(raiz.Trayecto.ejemplo());
+    const ejemplo = L.normalizar(raiz.Flecha.ejemplo());
     ejemplo.ajustes = { ...estado.ajustes, ejemplo: true };
     return ejemplo;
   }
@@ -130,5 +130,5 @@
     return almacenLocal(avisos);
   }
 
-  raiz.Trayecto = Object.assign(raiz.Trayecto || {}, { almacen: { abrir } });
+  raiz.Flecha = Object.assign(raiz.Flecha || {}, { almacen: { abrir } });
 })(window);

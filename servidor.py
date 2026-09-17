@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Servidor local de Trayecto. Solo biblioteca estándar de Python 3.8+.
+"""Servidor local de Flecha. Solo biblioteca estándar de Python 3.8+.
 
 Sirve la interfaz (carpeta web/) y guarda el estado en dos archivos JSON:
 
-    trayecto.json      proyectos activos y ajustes
+    flecha.json      proyectos activos y ajustes
     finalizadas.json   tareas y proyectos terminados (para poder revertirlos)
 
 Por defecto solo escucha en esta computadora (127.0.0.1).
@@ -46,7 +46,7 @@ TIPOS = {
 
 
 def carpeta_datos(valor=None):
-    ruta = valor or os.environ.get("TRAYECTO_DIR") or "~/.trayecto"
+    ruta = valor or os.environ.get("FLECHA_DIR") or "~/.flecha"
     return Path(ruta).expanduser().resolve()
 
 
@@ -55,7 +55,7 @@ class Almacen:
 
     def __init__(self, carpeta):
         self.carpeta = Path(carpeta)
-        self.activos = self.carpeta / "trayecto.json"
+        self.activos = self.carpeta / "flecha.json"
         self.finalizadas = self.carpeta / "finalizadas.json"
         self.candado = threading.Lock()
 
@@ -135,7 +135,7 @@ def validar(estado):
 
 
 class Manejador(BaseHTTPRequestHandler):
-    server_version = "Trayecto"
+    server_version = "Flecha"
     almacen = None
     uso = None
     anfitriones = None  # None = cualquiera (modo --red)
@@ -196,8 +196,8 @@ class Manejador(BaseHTTPRequestHandler):
         if self.path.split("?", 1)[0] != "/api/estado":
             return self._json(HTTPStatus.NOT_FOUND, {"error": "no existe"})
         # Una página ajena no puede mandar este encabezado sin permiso CORS, que nunca damos.
-        if self.headers.get("X-Trayecto") != "1":
-            return self._json(HTTPStatus.FORBIDDEN, {"error": "falta X-Trayecto"})
+        if self.headers.get("X-Flecha") != "1":
+            return self._json(HTTPStatus.FORBIDDEN, {"error": "falta X-Flecha"})
         try:
             largo = int(self.headers.get("Content-Length", "0"))
         except ValueError:
@@ -245,7 +245,7 @@ def ip_local():
 
 
 def crear_servidor(carpeta, puerto=PUERTO, red=False, ruidoso=False, casa=None):
-    manejador = type("ManejadorTrayecto", (Manejador,), {})
+    manejador = type("ManejadorFlecha", (Manejador,), {})
     manejador.almacen = Almacen(carpeta)
     manejador.uso = Uso(carpeta, casa)
     servidor = ThreadingHTTPServer(("0.0.0.0" if red else "127.0.0.1", puerto), manejador)
@@ -293,31 +293,31 @@ def conectar_claude():
         return 1
     actual = datos.get("statusLine")
     if isinstance(actual, dict) and "claude_statusline.py" in str(actual.get("command", "")):
-        print("Claude Code ya está conectado con Trayecto.")
+        print("Claude Code ya está conectado con Flecha.")
         return 0
     if actual:
         print("Ya tienes una status line en Claude Code y no la voy a pisar:")
         print(f"  {json.dumps(actual, ensure_ascii=False)}")
-        print("Para conservarla y conectar Trayecto, cambia su comando por este:")
-        print(f"  TRAYECTO_STATUSLINE_SIGUIENTE='<tu comando actual>' {comando}")
+        print("Para conservarla y conectar Flecha, cambia su comando por este:")
+        print(f"  FLECHA_STATUSLINE_SIGUIENTE='<tu comando actual>' {comando}")
         return 1
     datos["statusLine"] = {"type": "command", "command": comando}
     ajustes.parent.mkdir(parents=True, exist_ok=True)
     if ajustes.exists():
-        shutil.copyfile(ajustes, ajustes.with_name("settings.json.antes-de-trayecto"))
+        shutil.copyfile(ajustes, ajustes.with_name("settings.json.antes-de-flecha"))
     temporal = ajustes.with_name("settings.json.tmp")
     temporal.write_text(json.dumps(datos, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     os.replace(temporal, ajustes)
-    print(f"Listo. Claude Code le pasará sus límites a Trayecto ({ajustes}).")
+    print(f"Listo. Claude Code le pasará sus límites a Flecha ({ajustes}).")
     print("Los porcentajes aparecen después del primer mensaje de tu siguiente sesión.")
     print('Para quitarlo, borra "statusLine" de ese archivo.')
     return 0
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="trayecto", description="Tus proyectos y su avance, en una línea.")
-    p.add_argument("--puerto", type=int, default=int(os.environ.get("TRAYECTO_PUERTO", PUERTO)))
-    p.add_argument("--datos", help="carpeta de los JSON (por defecto ~/.trayecto o $TRAYECTO_DIR)")
+    p = argparse.ArgumentParser(prog="flecha", description="Tus proyectos y su avance, en una línea.")
+    p.add_argument("--puerto", type=int, default=int(os.environ.get("FLECHA_PUERTO", PUERTO)))
+    p.add_argument("--datos", help="carpeta de los JSON (por defecto ~/.flecha o $FLECHA_DIR)")
     p.add_argument("--red", action="store_true", help="permite abrirlo desde otros dispositivos de tu red (tu teléfono)")
     p.add_argument("--ventana", action="store_true", help="abre una ventana sin barras (Chrome, Edge o Brave)")
     p.add_argument("--sin-abrir", action="store_true", help="no abre el navegador")
@@ -332,11 +332,11 @@ def main(argv=None):
         servidor = crear_servidor(carpeta, args.puerto, args.red, args.ruidoso)
     except OSError as error:
         print(f"No pude abrir el puerto {args.puerto}: {error}", file=sys.stderr)
-        print("¿Ya está corriendo Trayecto? Prueba con --puerto 4748.", file=sys.stderr)
+        print("¿Ya está corriendo Flecha? Prueba con --puerto 4748.", file=sys.stderr)
         return 1
 
     url = f"http://127.0.0.1:{servidor.server_address[1]}/"
-    print(f"Trayecto   {url}")
+    print(f"Flecha   {url}")
     print(f"Datos      {carpeta}")
     if args.red:
         ip = ip_local()

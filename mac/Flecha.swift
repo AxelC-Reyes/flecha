@@ -1,4 +1,4 @@
-// Trayecto para macOS: la línea vive pegada al borde de tu pantalla, encima de todo.
+// Flecha para macOS: la línea vive pegada al borde de tu pantalla, encima de todo.
 //
 // Es una ventana flotante y transparente que muestra la misma interfaz web
 // (carpeta web/) y arranca por su cuenta el servidor local (servidor.py).
@@ -59,7 +59,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
 
     private func crearPanel() {
         let config = WKWebViewConfiguration()
-        config.userContentController.add(self, name: "trayecto")
+        config.userContentController.add(self, name: "flecha")
         web = Vista(frame: .zero, configuration: config)
         web.setValue(false, forKey: "drawsBackground")
         web.navigationDelegate = self
@@ -109,7 +109,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
         }
         imagen.isTemplate = true
         icono.button?.image = imagen
-        icono.button?.toolTip = "Trayecto"
+        icono.button?.toolTip = "Flecha"
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Abrir o cerrar", action: #selector(alternar), keyEquivalent: "")
@@ -117,7 +117,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
         siempre.state = encima ? .on : .off
         menu.addItem(withTitle: "Abrir en el navegador", action: #selector(abrirNavegador), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Salir de Trayecto", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Salir de Flecha", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         for item in menu.items where item.action != #selector(NSApplication.terminate(_:)) { item.target = self }
         icono.menu = menu
     }
@@ -127,7 +127,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
     private func responde() -> Bool {
         var pedido = URLRequest(url: base.appendingPathComponent("api/estado"))
         pedido.timeoutInterval = 0.6
-        pedido.setValue("1", forHTTPHeaderField: "X-Trayecto")
+        pedido.setValue("1", forHTTPHeaderField: "X-Flecha")
         let espera = DispatchSemaphore(value: 0)
         var ok = false
         URLSession.shared.dataTask(with: pedido) { _, respuesta, _ in
@@ -140,7 +140,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
 
     private func asegurarServidor() -> Bool {
         if responde() { return true } // ya había uno corriendo: se reutiliza
-        guard let raiz = Bundle.main.object(forInfoDictionaryKey: "TrayectoRaiz") as? String else { return false }
+        guard let raiz = Bundle.main.object(forInfoDictionaryKey: "FlechaRaiz") as? String else { return false }
         let guion = URL(fileURLWithPath: raiz).appendingPathComponent("servidor.py").path
         guard FileManager.default.fileExists(atPath: guion) else { return false }
 
@@ -160,14 +160,14 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
     }
 
     private func cargar() {
-        // `Trayecto --abierto` arranca ya desplegado (útil para probar).
+        // `Flecha --abierto` arranca ya desplegado (útil para probar).
         let inicio = CommandLine.arguments.contains("--abierto") ? URL(string: "?abierto=1", relativeTo: base)! : base
         web.load(URLRequest(url: inicio, cachePolicy: .reloadIgnoringLocalCacheData))
     }
 
     private func avisarSinServidor() {
         let alerta = NSAlert()
-        alerta.messageText = "Trayecto no pudo arrancar su servidor local"
+        alerta.messageText = "Flecha no pudo arrancar su servidor local"
         alerta.informativeText = "Revisa que exista python3 y que la carpeta del repositorio no se haya movido. Si la moviste, vuelve a correr mac/construir.sh."
         NSApp.activate(ignoringOtherApps: true)
         alerta.runModal()
@@ -254,7 +254,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        if expandido { web.evaluateJavaScript("window.Trayecto && window.Trayecto.cerrar()") }
+        if expandido { web.evaluateJavaScript("window.Flecha && window.Flecha.cerrar()") }
     }
 
     // Los enlaces externos se abren en el navegador, no dentro del panel.
@@ -269,7 +269,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
     // MARK: menú
 
     @objc private func alternar() {
-        web.evaluateJavaScript("window.Trayecto && (document.getElementById('widget').classList.contains('abierto') ? window.Trayecto.cerrar() : window.Trayecto.abrir())")
+        web.evaluateJavaScript("window.Flecha && (document.getElementById('widget').classList.contains('abierto') ? window.Flecha.cerrar() : window.Flecha.abrir())")
     }
 
     @objc private func alternarEncima(_ item: NSMenuItem) {

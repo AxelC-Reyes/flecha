@@ -1,4 +1,4 @@
-# Publica la carpeta web/ en GitHub Pages: Trayecto sin instalar nada,
+# Publica la carpeta web/ en GitHub Pages: Flecha sin instalar nada,
 # con los datos guardados en el navegador de cada persona.
 name: pages
 on:

@@ -1,4 +1,4 @@
-// Proyectos ficticios para la primera vez que alguien abre Trayecto.
+// Proyectos ficticios para la primera vez que alguien abre Flecha.
 // Va como script (y no como .json) para que funcione también con doble clic.
 
 (function (raiz) {
@@ -42,7 +42,7 @@
     },
   };
 
-  raiz.Trayecto = Object.assign(raiz.Trayecto || {}, {
-    ejemplo: () => structuredClone(raiz.Trayecto.idioma === 'en' ? en : es),
+  raiz.Flecha = Object.assign(raiz.Flecha || {}, {
+    ejemplo: () => structuredClone(raiz.Flecha.idioma === 'en' ? en : es),
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

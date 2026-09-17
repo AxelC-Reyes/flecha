@@ -1,0 +1,13 @@
+#!/bin/sh
+# Arranca Flecha en esta computadora y lo abre en tu navegador.
+#   ./flecha             solo para ti (127.0.0.1)
+#   ./flecha --red       también para tu teléfono, en la misma red wifi
+#   ./flecha --ventana   ventana sin barras (Chrome, Edge o Brave)
+#   ./flecha --help      todas las opciones
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+for py in python3 python; do
+  if command -v "$py" >/dev/null 2>&1; then exec "$py" "$AQUI/servidor.py" "$@"; fi
+done
+echo "Flecha necesita Python 3 (https://www.python.org/downloads/)." >&2
+echo "Sin Python también funciona: abre web/index.html con doble clic." >&2
+exit 1

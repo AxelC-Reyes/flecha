@@ -41,7 +41,7 @@ class PruebaServidor(unittest.TestCase):
         return respuesta, contenido
 
     def guardar(self, estado, extra=None):
-        encabezados = {"X-Trayecto": "1", "Content-Type": "application/json", **(extra or {})}
+        encabezados = {"X-Flecha": "1", "Content-Type": "application/json", **(extra or {})}
         return self.pedir("PUT", "/api/estado", estado, encabezados)
 
     def test_estado_vacio_sin_archivos(self):
@@ -55,7 +55,7 @@ class PruebaServidor(unittest.TestCase):
     def test_guardar_separa_en_dos_archivos(self):
         r, _ = self.guardar(ESTADO)
         self.assertEqual(r.status, 200)
-        activos = json.loads((self.carpeta / "trayecto.json").read_text(encoding="utf-8"))
+        activos = json.loads((self.carpeta / "flecha.json").read_text(encoding="utf-8"))
         finalizadas = json.loads((self.carpeta / "finalizadas.json").read_text(encoding="utf-8"))
         self.assertEqual(activos["proyectos"][0]["nombre"], "Huerto")
         self.assertNotIn("finalizadas", activos)
@@ -72,7 +72,7 @@ class PruebaServidor(unittest.TestCase):
     def test_conflicto_si_el_archivo_cambio_por_fuera(self):
         r, _ = self.guardar(ESTADO)
         huella = r.getheader("ETag")
-        ruta = self.carpeta / "trayecto.json"
+        ruta = self.carpeta / "flecha.json"
         activos = json.loads(ruta.read_text(encoding="utf-8"))
         activos["proyectos"][0]["nombre"] = "Editado a mano"
         ruta.write_text(json.dumps(activos), encoding="utf-8")
@@ -85,7 +85,7 @@ class PruebaServidor(unittest.TestCase):
         otro = json.loads(json.dumps(ESTADO))
         otro["proyectos"][0]["nombre"] = "Jardín"
         self.guardar(otro)
-        respaldo = json.loads((self.carpeta / "trayecto.json.bak").read_text(encoding="utf-8"))
+        respaldo = json.loads((self.carpeta / "flecha.json.bak").read_text(encoding="utf-8"))
         self.assertEqual(respaldo["proyectos"][0]["nombre"], "Huerto")
 
     def test_rechaza_escrituras_sin_encabezado(self):

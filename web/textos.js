@@ -4,7 +4,7 @@
   'use strict';
 
   const es = {
-    abrir: 'Abrir Trayecto',
+    abrir: 'Abrir Flecha',
     sinProyectos: 'Aún no hay proyectos. Crea el primero.',
     nuevoProyecto: 'Nuevo proyecto',
     nombreProyecto: 'Nombre',
@@ -42,7 +42,7 @@
     importar: 'Importar',
     empezarDeCero: 'Empezar de cero',
     notaLocal: 'Tus datos viven solo en este navegador. Exporta un respaldo de vez en cuando.',
-    notaServidor: 'Tus datos viven en trayecto.json y finalizadas.json, en tu computadora.',
+    notaServidor: 'Tus datos viven en flecha.json y finalizadas.json, en tu computadora.',
     notaEjemplo: 'Estás viendo proyectos de ejemplo.',
     avisoTarea: 'Tarea finalizada',
     avisoProyecto: 'Proyecto terminado',
@@ -50,7 +50,7 @@
     avisoRevertida: 'De vuelta en pendientes',
     avisoExterno: 'Actualizado desde el archivo',
     avisoImportado: 'Datos importados',
-    avisoImportMal: 'Ese archivo no es de Trayecto',
+    avisoImportMal: 'Ese archivo no es de Flecha',
     avisoNoGuardo: 'No se pudo guardar',
     deshacer: 'Deshacer',
     uso: 'Uso',
@@ -61,11 +61,11 @@
     sinUso: 'sin uso en esta ventana',
     hoy: 'hoy',
     sieteDias: '7 días',
-    conectarClaude: 'Para ver los límites de Claude, corre una vez: ./trayecto --conectar-claude',
+    conectarClaude: 'Para ver los límites de Claude, corre una vez: ./flecha --conectar-claude',
   };
 
   const en = {
-    abrir: 'Open Trayecto',
+    abrir: 'Open Flecha',
     sinProyectos: 'No projects yet. Create the first one.',
     nuevoProyecto: 'New project',
     nombreProyecto: 'Name',
@@ -103,7 +103,7 @@
     importar: 'Import',
     empezarDeCero: 'Start from scratch',
     notaLocal: 'Your data lives only in this browser. Export a backup now and then.',
-    notaServidor: 'Your data lives in trayecto.json and finalizadas.json, on your computer.',
+    notaServidor: 'Your data lives in flecha.json and finalizadas.json, on your computer.',
     notaEjemplo: 'You are looking at sample projects.',
     avisoTarea: 'Task completed',
     avisoProyecto: 'Project finished',
@@ -111,7 +111,7 @@
     avisoRevertida: 'Back in pending',
     avisoExterno: 'Updated from the file',
     avisoImportado: 'Data imported',
-    avisoImportMal: 'That file is not from Trayecto',
+    avisoImportMal: 'That file is not from Flecha',
     avisoNoGuardo: 'Could not save',
     deshacer: 'Undo',
     uso: 'Usage',
@@ -122,13 +122,13 @@
     sinUso: 'unused in this window',
     hoy: 'today',
     sieteDias: '7 days',
-    conectarClaude: 'To see Claude limits, run once: ./trayecto --conectar-claude',
+    conectarClaude: 'To see Claude limits, run once: ./flecha --conectar-claude',
   };
 
   const idioma = ((raiz.navigator && raiz.navigator.language) || 'es').toLowerCase().startsWith('en') ? 'en' : 'es';
   const tabla = idioma === 'en' ? en : es;
 
-  raiz.Trayecto = Object.assign(raiz.Trayecto || {}, {
+  raiz.Flecha = Object.assign(raiz.Flecha || {}, {
     idioma,
     t: (clave) => tabla[clave] || es[clave] || clave,
   });

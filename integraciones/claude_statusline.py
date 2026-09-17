@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Puente entre Claude Code y Trayecto.
+"""Puente entre Claude Code y Flecha.
 
 Claude Code le pasa a su "status line" un JSON con el uso de tus límites
-(ventana de 5 horas y semanal). Este script guarda ese dato donde Trayecto
+(ventana de 5 horas y semanal). Este script guarda ese dato donde Flecha
 lo lee (<datos>/uso/claude.json) y pinta una línea de estado mínima.
 
-Se instala con:   ./trayecto --conectar-claude
+Se instala con:   ./flecha --conectar-claude
 o a mano, en ~/.claude/settings.json:
 
-    "statusLine": { "type": "command", "command": "python3 /ruta/a/trayecto/integraciones/claude_statusline.py" }
+    "statusLine": { "type": "command", "command": "python3 /ruta/a/flecha/integraciones/claude_statusline.py" }
 
 Si ya tienes una status line y quieres conservarla, pon su comando en la
-variable TRAYECTO_STATUSLINE_SIGUIENTE: recibe la misma entrada y se muestra
+variable FLECHA_STATUSLINE_SIGUIENTE: recibe la misma entrada y se muestra
 su salida en lugar de la de este script.
 
 No guarda nada de tus conversaciones: solo `rate_limits` y la hora.
@@ -26,7 +26,7 @@ from pathlib import Path
 
 
 def guardar(limites):
-    carpeta = Path(os.environ.get("TRAYECTO_DIR") or "~/.trayecto").expanduser() / "uso"
+    carpeta = Path(os.environ.get("FLECHA_DIR") or "~/.flecha").expanduser() / "uso"
     carpeta.mkdir(parents=True, exist_ok=True)
     destino = carpeta / "claude.json"
     temporal = carpeta / f"claude.json.{os.getpid()}.tmp"
@@ -56,7 +56,7 @@ def main():
             guardar(datos["rate_limits"])
         except OSError:
             pass
-    siguiente = os.environ.get("TRAYECTO_STATUSLINE_SIGUIENTE")
+    siguiente = os.environ.get("FLECHA_STATUSLINE_SIGUIENTE")
     if siguiente:
         try:
             salida = subprocess.run(siguiente, shell=True, input=crudo, capture_output=True, text=True, timeout=5).stdout

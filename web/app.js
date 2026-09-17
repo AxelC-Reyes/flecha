@@ -1,10 +1,10 @@
-// Interfaz de Trayecto: una línea que se abre en un cuadrado con tus proyectos,
+// Interfaz de Flecha: una línea que se abre en un cuadrado con tus proyectos,
 // con las barras de avance desplegándose por fuera.
 
 (function () {
   'use strict';
 
-  const { logica: L, t } = window.Trayecto;
+  const { logica: L, t } = window.Flecha;
   const $ = (id) => document.getElementById(id);
   const html = document.documentElement;
   const escena = $('escena');
@@ -19,7 +19,7 @@
   const MORFOSIS_MS = 560;
   const CAMBIO_MS = 130;
   const calmado = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const puente = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.trayecto;
+  const puente = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.flecha;
   const nativo = (tipo, extra) => puente && puente.postMessage({ tipo, ...extra });
 
   let almacen = null;
@@ -653,7 +653,7 @@
   async function cargarUso() {
     if (!almacen || almacen.modo !== 'servidor') return;
     try {
-      const r = await fetch('api/uso', { headers: { 'X-Trayecto': '1' }, cache: 'no-store' });
+      const r = await fetch('api/uso', { headers: { 'X-Flecha': '1' }, cache: 'no-store' });
       if (!r.ok) return;
       const nuevo = await r.json();
       const cambio = JSON.stringify(nuevo.herramientas) !== JSON.stringify(uso && uso.herramientas);
@@ -757,7 +757,7 @@
 
   function exportar() {
     const archivo = new Blob([JSON.stringify(estado, null, 2)], { type: 'application/json' });
-    const enlace = h('a', { href: URL.createObjectURL(archivo), download: `trayecto-${new Date().toISOString().slice(0, 10)}.json` });
+    const enlace = h('a', { href: URL.createObjectURL(archivo), download: `flecha-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(enlace);
     enlace.click();
     enlace.remove();
@@ -869,7 +869,7 @@
 
   async function arrancar() {
     if (puente) html.classList.add('nativo');
-    almacen = await window.Trayecto.almacen.abrir({
+    almacen = await window.Flecha.almacen.abrir({
       externo(nuevo) {
         if (escribiendo() || ajustando) return false;
         if (JSON.stringify(nuevo) === JSON.stringify(estado)) return true;
@@ -896,7 +896,7 @@
     }
   }
 
-  window.Trayecto.cerrar = cerrar;
-  window.Trayecto.abrir = abrir;
+  window.Flecha.cerrar = cerrar;
+  window.Flecha.abrir = abrir;
   arrancar();
 })();

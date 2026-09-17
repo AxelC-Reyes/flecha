@@ -1,8 +1,8 @@
-# Trayecto
+# Flecha
 
 Tus proyectos y su avance, en una línea.
 
-En reposo Trayecto es solo eso: una línea vertical. La tocas y se abre en un cuadrado con los nombres de tus proyectos; las barras de avance se despliegan **por fuera** del cuadrado, cada una con su porcentaje al final. Nunca ves la barra completa, solo lo que llevas. Tocas un proyecto y aparecen sus faltantes. Cuando algo llega al 100 % desaparece, pero queda guardado en un archivo de finalizadas por si quieres revertirlo.
+En reposo Flecha es solo eso: una línea vertical. La tocas y se abre en un cuadrado con los nombres de tus proyectos; las barras de avance se despliegan **por fuera** del cuadrado, cada una con su porcentaje al final. Nunca ves la barra completa, solo lo que llevas. Tocas un proyecto y aparecen sus faltantes. Cuando algo llega al 100 % desaparece, pero queda guardado en un archivo de finalizadas por si quieres revertirlo.
 
 ![La lista abierta, con las barras por fuera](capturas/lista.png)
 
@@ -17,8 +17,8 @@ Sin cuentas, sin nube, sin dependencias. Tus datos son dos archivos JSON en tu c
 ## Instalar
 
 ```sh
-git clone https://github.com/AxelC-Reyes/trayecto.git
-cd trayecto
+git clone https://github.com/AxelC-Reyes/flecha.git
+cd flecha
 ```
 
 Y eliges cómo usarlo:
@@ -26,14 +26,14 @@ Y eliges cómo usarlo:
 ### 1. En cualquier computadora (macOS, Windows, Linux)
 
 ```sh
-./trayecto            # Windows: trayecto.bat
+./flecha            # Windows: flecha.bat
 ```
 
-Solo necesita Python 3, que en macOS y Linux ya viene instalado. Abre Trayecto en tu navegador y guarda tus datos en `~/.trayecto/`.
+Solo necesita Python 3, que en macOS y Linux ya viene instalado. Abre Flecha en tu navegador y guarda tus datos en `~/.flecha/`.
 
-- `./trayecto --ventana` lo abre en una ventana sin barras (Chrome, Edge o Brave).
-- `./trayecto --red` lo comparte con tu red wifi para abrirlo desde el teléfono. Ojo: cualquiera en esa red puede verlo y editarlo.
-- `./trayecto --datos otra/carpeta` o la variable `TRAYECTO_DIR` cambian dónde viven los JSON.
+- `./flecha --ventana` lo abre en una ventana sin barras (Chrome, Edge o Brave).
+- `./flecha --red` lo comparte con tu red wifi para abrirlo desde el teléfono. Ojo: cualquiera en esa red puede verlo y editarlo.
+- `./flecha --datos otra/carpeta` o la variable `FLECHA_DIR` cambian dónde viven los JSON.
 
 ### 2. Widget flotante en macOS
 
@@ -41,7 +41,7 @@ Solo necesita Python 3, que en macOS y Linux ya viene instalado. Abre Trayecto e
 mac/construir.sh --abrir
 ```
 
-Compila `mac/build/Trayecto.app` (unos segundos; requiere `xcode-select --install`). La línea queda pegada al borde de tu pantalla, encima de todo, en todos los escritorios. Desde el ícono de la barra de menús puedes mandarla detrás de tus ventanas o salir. Para que arranque con tu Mac: Ajustes del Sistema → General → Ítems de inicio.
+Compila `mac/build/Flecha.app` (unos segundos; requiere `xcode-select --install`). La línea queda pegada al borde de tu pantalla, encima de todo, en todos los escritorios. Desde el ícono de la barra de menús puedes mandarla detrás de tus ventanas o salir. Para que arranque con tu Mac: Ajustes del Sistema → General → Ítems de inicio.
 
 ### 3. Sin instalar nada (teléfono incluido)
 
@@ -59,31 +59,31 @@ Abre `web/index.html` con doble clic, o publica la carpeta `web/` en cualquier h
 
 ## Uso de tus asistentes de código
 
-Si usas Claude Code, Codex o Gemini CLI, Trayecto agrega solo una sección **Uso** (el ícono del medidor): cuánto llevas gastado de cada límite, cuándo se reinicia, y los tokens de hoy y de los últimos 7 días. Así no andas abriendo `/usage` ni `/status`. A partir de 90 % la barra se pone roja.
+Si usas Claude Code, Codex o Gemini CLI, Flecha agrega solo una sección **Uso** (el ícono del medidor): cuánto llevas gastado de cada límite, cuándo se reinicia, y los tokens de hoy y de los últimos 7 días. Así no andas abriendo `/usage` ni `/status`. A partir de 90 % la barra se pone roja.
 
 ![Uso de Claude y Codex, con las barras por fuera](capturas/uso.png)
 
-Todo sale de archivos que esas herramientas ya dejan en tu computadora. Trayecto no usa tus contraseñas, no llama a ningún servicio y no lee el contenido de tus conversaciones: solo cuenta tokens.
+Todo sale de archivos que esas herramientas ya dejan en tu computadora. Flecha no usa tus contraseñas, no llama a ningún servicio y no lee el contenido de tus conversaciones: solo cuenta tokens.
 
 | Herramienta | Límites (5 h y semana) | Tokens |
 | --- | --- | --- |
 | Codex | Sí, automático. Se actualizan cada vez que usas Codex | Sí |
-| Claude Code | Sí, tras correr una vez `./trayecto --conectar-claude` | Sí |
+| Claude Code | Sí, tras correr una vez `./flecha --conectar-claude` | Sí |
 | Gemini CLI | No los publica | Sí (lector sin probar con datos reales; se agradecen reportes) |
 
 `--conectar-claude` registra `integraciones/claude_statusline.py` como *status line* de Claude Code, que es por donde Claude Code entrega el uso de tus límites (planes Pro y Max). De paso verás una línea discreta en tu terminal, por ejemplo `Fable 5.1 · 5 h 41% · 7 d 29%`. Si ya tenías una status line no la toca y te dice cómo encadenarlas. Para quitarlo, borra la clave `statusLine` de los ajustes de Claude Code.
 
-Los porcentajes son los que reportó cada herramienta la última vez que la usaste; si una ventana ya se reinició, Trayecto la muestra en cero. "Tokens" cuenta entrada nueva, escritura de caché y salida; deja fuera las lecturas de caché, que son enormes y casi gratis. Esta sección solo existe con el servidor local (no en la versión estática).
+Los porcentajes son los que reportó cada herramienta la última vez que la usaste; si una ventana ya se reinició, Flecha la muestra en cero. "Tokens" cuenta entrada nueva, escritura de caché y salida; deja fuera las lecturas de caché, que son enormes y casi gratis. Esta sección solo existe con el servidor local (no en la versión estática).
 
 ## Tus datos
 
 ```
-~/.trayecto/
-  trayecto.json      proyectos activos y ajustes
+~/.flecha/
+  flecha.json      proyectos activos y ajustes
   finalizadas.json   lo terminado, para poder revertirlo
 ```
 
-Son JSON legibles y puedes editarlos a mano o con scripts; Trayecto detecta el cambio y se actualiza solo. El formato completo está en [ESQUEMA.md](ESQUEMA.md). Lo mínimo que acepta:
+Son JSON legibles y puedes editarlos a mano o con scripts; Flecha detecta el cambio y se actualiza solo. El formato completo está en [ESQUEMA.md](ESQUEMA.md). Lo mínimo que acepta:
 
 ```json
 {
@@ -119,7 +119,7 @@ El código y los nombres están en español. La interfaz sale en español o ingl
 
 ## English, briefly
 
-Trayecto is a tiny progress widget: a single line that opens into a rounded square listing your projects, with progress bars unfolding *outside* of it. Tap a project to see what's left; finished items move to an archive so you can revert them. No accounts, no cloud, no dependencies. Run `./trayecto` (Python 3), build the floating macOS widget with `mac/construir.sh --abrir`, or just open `web/index.html`. The UI switches to English automatically.
+Flecha is a tiny progress widget: a single line that opens into a rounded square listing your projects, with progress bars unfolding *outside* of it. Tap a project to see what's left; finished items move to an archive so you can revert them. No accounts, no cloud, no dependencies. Run `./flecha` (Python 3), build the floating macOS widget with `mac/construir.sh --abrir`, or just open `web/index.html`. The UI switches to English automatically.
 
 ## Licencia
 
