@@ -396,12 +396,13 @@ button {
 .tabla {
   display: grid;
   grid-template-columns: 1fr auto auto;
-  gap: 4px 14px;
+  gap: 4px 10px;
   align-items: baseline;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;
   color: var(--texto2);
 }
+.tabla > * { white-space: nowrap; }
 .tabla .rotulo { margin: 0 0 2px; }
 .tabla b { font-weight: 600; color: var(--texto); }
 .tabla span:not(:nth-child(3n + 1)) { text-align: end; }
@@ -759,6 +760,11 @@ input[type="range"]::-moz-range-thumb {
   color: var(--tinte);
 }
 .aviso button:active { opacity: 0.5; }
+
+/* iOS hace zoom al enfocar campos con letra menor a 16 px */
+@media (pointer: coarse) {
+  input, textarea { font-size: 16px; }
+}
 
 @keyframes aparecer {
   from { opacity: 0; }

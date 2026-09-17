@@ -57,11 +57,19 @@
     ventana5h: '5 h',
     ventana7d: 'semana',
     ventanaGasto: 'gasto',
-    reinicia: 'se reinicia en',
-    sinUso: 'sin uso en esta ventana',
+    reinicia: 'reinicia en',
+    sinUso: 'sin uso',
     hoy: 'hoy',
     sieteDias: '7 días',
     conectarClaude: 'Para ver los límites de Claude, corre una vez: ./flecha --conectar-claude',
+    tuMac: 'Tu Mac',
+    conectar: 'Conectar con mi Mac',
+    desconectar: 'Desconectar',
+    notaConectar: 'En tu Mac corre ./flecha --red y pega aquí el enlace que te da. Verás tus proyectos de la Mac y el uso de tus asistentes.',
+    macEnLinea: 'Conectado a',
+    macSinConexion: 'Sin conexión con',
+    notaNativa: 'Tus datos viven en este dispositivo.',
+    notaNativaMac: 'Estás viendo los datos de tu Mac.',
   };
 
   const en = {
@@ -119,10 +127,18 @@
     ventana7d: 'week',
     ventanaGasto: 'spend',
     reinicia: 'resets in',
-    sinUso: 'unused in this window',
+    sinUso: 'unused',
     hoy: 'today',
     sieteDias: '7 days',
     conectarClaude: 'To see Claude limits, run once: ./flecha --conectar-claude',
+    tuMac: 'Your Mac',
+    conectar: 'Connect to my Mac',
+    desconectar: 'Disconnect',
+    notaConectar: 'On your Mac run ./flecha --red and paste the link it prints here. You will see your Mac projects and your assistant usage.',
+    macEnLinea: 'Connected to',
+    macSinConexion: 'No connection to',
+    notaNativa: 'Your data lives on this device.',
+    notaNativaMac: 'You are looking at the data on your Mac.',
   };
 
   const idioma = ((raiz.navigator && raiz.navigator.language) || 'es').toLowerCase().startsWith('en') ? 'en' : 'es';

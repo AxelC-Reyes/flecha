@@ -11,8 +11,10 @@ Por defecto solo escucha en esta computadora (127.0.0.1).
 
 import argparse
 import hashlib
+import hmac
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -22,6 +24,7 @@ import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from uso import Uso  # noqa: E402
@@ -139,6 +142,8 @@ class Manejador(BaseHTTPRequestHandler):
     almacen = None
     uso = None
     anfitriones = None  # None = cualquiera (modo --red)
+    clave = None  # con --red: lo que deben presentar los demás dispositivos
+    clave_siempre = False  # solo para pruebas: exigirla también a esta computadora
 
     def log_message(self, formato, *args):
         if self.server.ruidoso:
@@ -168,6 +173,42 @@ class Manejador(BaseHTTPRequestHandler):
             return True
         return self.headers.get("Host", "").lower() in self.anfitriones
 
+    def _es_esta_maquina(self):
+        return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
+    def _clave_presentada(self):
+        directa = self.headers.get("X-Flecha-Clave")
+        if directa:
+            return directa
+        for trozo in self.headers.get("Cookie", "").split(";"):
+            nombre, _, valor = trozo.strip().partition("=")
+            if nombre == "flecha_clave":
+                return valor
+        return None
+
+    def _autorizado(self):
+        """Con --red, los demás dispositivos deben traer la clave del enlace."""
+        if self.clave is None or (self._es_esta_maquina() and not self.clave_siempre):
+            return True
+        presentada = self._clave_presentada()
+        return bool(presentada) and hmac.compare_digest(presentada, self.clave)
+
+    def _canjear_clave(self):
+        """`/?clave=...` guarda la clave en una cookie y limpia la URL. Devuelve si respondió."""
+        partes = urlsplit(self.path)
+        ofrecida = parse_qs(partes.query).get("clave", [None])[0]
+        if self.clave is None or not ofrecida:
+            return False
+        if not hmac.compare_digest(ofrecida, self.clave):
+            return False
+        galleta = f"flecha_clave={self.clave}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict"
+        self._responder(HTTPStatus.FOUND, extra={"Location": partes.path or "/", "Set-Cookie": galleta})
+        return True
+
+    def _sin_clave(self):
+        cuerpo = "Falta la clave. Abre el enlace completo que imprime ./flecha --red (incluye ?clave=...).".encode("utf-8")
+        self._responder(HTTPStatus.UNAUTHORIZED, cuerpo)
+
     def _origen_valido(self):
         origen = self.headers.get("Origin")
         if not origen:
@@ -179,7 +220,13 @@ class Manejador(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._anfitrion_valido():
             return self._responder(HTTPStatus.FORBIDDEN, b"Host no permitido")
+        if self._canjear_clave():
+            return None
+        if not self._autorizado():
+            return self._sin_clave()
         ruta = self.path.split("?", 1)[0].split("#", 1)[0]
+        if ruta == "/api/enlace":
+            return self._enlace()
         if ruta == "/api/estado":
             return self._leer_estado()
         if ruta == "/api/uso":
@@ -193,6 +240,8 @@ class Manejador(BaseHTTPRequestHandler):
     def do_PUT(self):
         if not self._anfitrion_valido() or not self._origen_valido():
             return self._responder(HTTPStatus.FORBIDDEN, b"Origen no permitido")
+        if not self._autorizado():
+            return self._sin_clave()
         if self.path.split("?", 1)[0] != "/api/estado":
             return self._json(HTTPStatus.NOT_FOUND, {"error": "no existe"})
         # Una página ajena no puede mandar este encabezado sin permiso CORS, que nunca damos.
@@ -216,6 +265,12 @@ class Manejador(BaseHTTPRequestHandler):
         if huella is None:
             return self._json(HTTPStatus.CONFLICT, {"error": "el archivo cambió por fuera"})
         self._json(HTTPStatus.OK, {"ok": True}, {"ETag": huella})
+
+    def _enlace(self):
+        """El enlace para el teléfono. Solo se le entrega a esta misma computadora."""
+        if not self._es_esta_maquina():
+            return self._json(HTTPStatus.FORBIDDEN, {"error": "solo desde esta computadora"})
+        self._json(HTTPStatus.OK, {"red": self.clave is not None, "url": enlace_red(self.server.server_address[1], self.clave)})
 
     def _leer_estado(self):
         try:
@@ -244,9 +299,33 @@ def ip_local():
         return None
 
 
+def clave_de_red(carpeta):
+    """La clave vive en <datos>/clave. Bórrala para generar otra y desconectar a todos."""
+    ruta = Path(carpeta) / "clave"
+    try:
+        guardada = ruta.read_text(encoding="utf-8").strip()
+        if len(guardada) >= 8:
+            return guardada
+    except OSError:
+        pass
+    nueva = secrets.token_urlsafe(9)
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(nueva + "\n", encoding="utf-8")
+    os.chmod(ruta, 0o600)
+    return nueva
+
+
+def enlace_red(puerto, clave):
+    ip = ip_local()
+    if not ip or not clave:
+        return None
+    return f"http://{ip}:{puerto}/?clave={clave}"
+
+
 def crear_servidor(carpeta, puerto=PUERTO, red=False, ruidoso=False, casa=None):
     manejador = type("ManejadorFlecha", (Manejador,), {})
     manejador.almacen = Almacen(carpeta)
+    manejador.clave = clave_de_red(carpeta) if red else None
     manejador.uso = Uso(carpeta, casa)
     servidor = ThreadingHTTPServer(("0.0.0.0" if red else "127.0.0.1", puerto), manejador)
     servidor.daemon_threads = True
@@ -314,6 +393,18 @@ def conectar_claude():
     return 0
 
 
+def vigilar_padre(servidor):
+    """Si quien nos arrancó desaparece (aunque sea a la fuerza), no dejamos el servidor huérfano."""
+    padre = os.getppid()
+
+    def ronda():
+        while os.getppid() == padre:
+            threading.Event().wait(2)
+        servidor.shutdown()
+
+    threading.Thread(target=ronda, daemon=True).start()
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="flecha", description="Tus proyectos y su avance, en una línea.")
     p.add_argument("--puerto", type=int, default=int(os.environ.get("FLECHA_PUERTO", PUERTO)))
@@ -322,6 +413,7 @@ def main(argv=None):
     p.add_argument("--ventana", action="store_true", help="abre una ventana sin barras (Chrome, Edge o Brave)")
     p.add_argument("--sin-abrir", action="store_true", help="no abre el navegador")
     p.add_argument("--ruidoso", action="store_true", help="muestra cada petición")
+    p.add_argument("--con-padre", action="store_true", help=argparse.SUPPRESS)  # lo usa la app de Mac: salir si ella muere
     p.add_argument("--conectar-claude", action="store_true", help="conecta los límites de Claude Code con la sección Uso, y termina")
     args = p.parse_args(argv)
     if args.conectar_claude:
@@ -339,12 +431,14 @@ def main(argv=None):
     print(f"Flecha   {url}")
     print(f"Datos      {carpeta}")
     if args.red:
-        ip = ip_local()
-        if ip:
-            print(f"En tu red  http://{ip}:{servidor.server_address[1]}/")
-        print("Ojo: con --red cualquiera en tu misma red puede ver y editar tus proyectos.")
+        enlace = enlace_red(servidor.server_address[1], servidor.RequestHandlerClass.clave)
+        print(f"En tu red  {enlace or '(no encontré la IP de esta computadora)'}")
+        print("Ese enlace lleva una clave: ábrelo en tu teléfono, o pégalo en la app de Flecha.")
+        print(f"Para cambiarla, borra {carpeta / 'clave'} y vuelve a arrancar.")
     print("Ctrl+C para salir.")
 
+    if args.con_padre:
+        vigilar_padre(servidor)
     if not args.sin_abrir:
         if not (args.ventana and abrir_ventana(url)):
             webbrowser.open(url)

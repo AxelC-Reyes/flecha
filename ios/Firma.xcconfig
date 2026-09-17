@@ -1,0 +1,15 @@
+// Identidad de la app. Para instalarla en tu iPhone o iPad crea junto a este
+// archivo un `Firma.local.xcconfig` (git lo ignora) con TUS datos:
+//
+//     FLECHA_PREFIJO = com.tunombre
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// El prefijo debe ser único (Apple no deja repetir identificadores) y el equipo
+// es el de tu cuenta de Apple; también puedes elegirlo en Xcode, en
+// Signing & Capabilities de los dos targets. Para el simulador no hace falta nada.
+
+FLECHA_PREFIJO = io.github.flecha
+FLECHA_GRUPO = group.$(FLECHA_PREFIJO).flecha
+DEVELOPMENT_TEAM =
+
+#include? "Firma.local.xcconfig"

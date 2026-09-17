@@ -37,6 +37,11 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
         get { ajustes.object(forKey: "encima") as? Bool ?? true }
         set { ajustes.set(newValue, forKey: "encima") }
     }
+    /// Arrancar el servidor con --red, para la app de iPhone y iPad.
+    private var enRed: Bool {
+        get { ajustes.bool(forKey: "enRed") }
+        set { ajustes.set(newValue, forKey: "enRed") }
+    }
 
     // MARK: arranque
 
@@ -117,6 +122,10 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
         siempre.state = encima ? .on : .off
         menu.addItem(withTitle: "Abrir en el navegador", action: #selector(abrirNavegador), keyEquivalent: "")
         menu.addItem(.separator())
+        let compartir = menu.addItem(withTitle: "Compartir con mi iPhone o iPad", action: #selector(alternarRed), keyEquivalent: "")
+        compartir.state = enRed ? .on : .off
+        menu.addItem(withTitle: "Copiar enlace para el teléfono", action: #selector(copiarEnlace), keyEquivalent: "")
+        menu.addItem(.separator())
         menu.addItem(withTitle: "Salir de Flecha", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         for item in menu.items where item.action != #selector(NSApplication.terminate(_:)) { item.target = self }
         icono.menu = menu
@@ -146,7 +155,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
 
         let proceso = Process()
         proceso.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        proceso.arguments = ["python3", guion, "--sin-abrir", "--puerto", String(puerto)]
+        proceso.arguments = ["python3", guion, "--sin-abrir", "--con-padre", "--puerto", String(puerto)] + (enRed ? ["--red"] : [])
         proceso.standardOutput = FileHandle.nullDevice
         proceso.standardError = FileHandle.nullDevice
         do { try proceso.run() } catch { return false }
@@ -280,6 +289,55 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
 
     @objc private func abrirNavegador() {
         NSWorkspace.shared.open(base)
+    }
+
+    // MARK: compartir con el teléfono
+
+    private func avisar(_ titulo: String, _ detalle: String) {
+        let alerta = NSAlert()
+        alerta.messageText = titulo
+        alerta.informativeText = detalle
+        NSApp.activate(ignoringOtherApps: true)
+        alerta.runModal()
+    }
+
+    @objc private func alternarRed(_ item: NSMenuItem) {
+        guard let propio = servidor else {
+            return avisar("Flecha ya estaba corriendo por fuera",
+                          "El servidor lo arrancó otra ventana (./flecha), así que no puedo reiniciarlo. Ciérralo, vuelve a abrir esta app y activa la opción; o arráncalo tú con ./flecha --red.")
+        }
+        enRed.toggle()
+        item.state = enRed ? .on : .off
+        propio.terminate()
+        servidor = nil
+        DispatchQueue.global(qos: .userInitiated).async {
+            propio.waitUntilExit()
+            let listo = self.asegurarServidor()
+            DispatchQueue.main.async {
+                guard listo else { return self.avisarSinServidor() }
+                self.cargar()
+                if self.enRed { self.copiarEnlace() }
+            }
+        }
+    }
+
+    @objc private func copiarEnlace() {
+        var pedido = URLRequest(url: base.appendingPathComponent("api/enlace"))
+        pedido.timeoutInterval = 2
+        URLSession.shared.dataTask(with: pedido) { datos, _, _ in
+            let respuesta = datos.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+            let enlace = respuesta?["url"] as? String
+            DispatchQueue.main.async {
+                guard let enlace else {
+                    return self.avisar("Todavía no hay enlace",
+                                       "Activa primero \"Compartir con mi iPhone o iPad\" y revisa que esta Mac esté conectada a una red.")
+                }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(enlace, forType: .string)
+                self.avisar("Enlace copiado",
+                            "Pégalo en la app de Flecha de tu iPhone o iPad (Personalizar → Conectar con mi Mac), o ábrelo en su navegador. Lleva una clave: compártelo solo con tus dispositivos.\n\n\(enlace)")
+            }
+        }.resume()
     }
 }
 

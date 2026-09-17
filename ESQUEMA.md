@@ -79,4 +79,4 @@ En pantalla se redondea, y nunca se muestra 100 % mientras quede algo pendiente.
 
 - `GET /api/uso` devuelve el consumo de asistentes de código: `{ generado, herramientas: [{ id, nombre, plan, conectado, visto, limites: [{ id, usado, reinicia }], tokens: { hoy, semana } }] }`. `usado` va de 0 a 100 y `reinicia` es epoch en segundos. Solo lectura; ver `uso.py`.
 
-Por defecto solo escucha en `127.0.0.1` y rechaza peticiones con otro `Host` u `Origin`.
+Por defecto solo escucha en `127.0.0.1` y rechaza peticiones con otro `Host` u `Origin`. Con `--red` escucha en toda tu red, y los demás dispositivos deben presentar la clave de `<datos>/clave`: en el encabezado `X-Flecha-Clave`, o abriendo una vez `/?clave=...`, que la deja en una cookie. `GET /api/enlace` (solo desde la misma computadora) devuelve ese enlace completo.

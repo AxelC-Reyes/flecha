@@ -114,5 +114,56 @@ class PruebaServidor(unittest.TestCase):
         self.assertEqual(r.status, 404)
 
 
+class PruebaRed(unittest.TestCase):
+    """Con --red los demás dispositivos necesitan la clave del enlace."""
+
+    def setUp(self):
+        self.temporal = tempfile.TemporaryDirectory()
+        self.carpeta = Path(self.temporal.name) / "datos"
+        self.servidor = servidor.crear_servidor(self.carpeta, puerto=0, red=True)
+        self.servidor.RequestHandlerClass.clave_siempre = True  # tratar a esta máquina como ajena
+        self.clave = self.servidor.RequestHandlerClass.clave
+        self.puerto = self.servidor.server_address[1]
+        threading.Thread(target=self.servidor.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.servidor.shutdown()
+        self.servidor.server_close()
+        self.temporal.cleanup()
+
+    def pedir(self, metodo, ruta, cuerpo=None, encabezados=None):
+        conexion = http.client.HTTPConnection("127.0.0.1", self.puerto, timeout=5)
+        datos = json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None
+        conexion.request(metodo, ruta, body=datos, headers=encabezados or {})
+        respuesta = conexion.getresponse()
+        respuesta.read()
+        conexion.close()
+        return respuesta
+
+    def test_sin_clave_no_entra(self):
+        self.assertEqual(self.pedir("GET", "/").status, 401)
+        self.assertEqual(self.pedir("GET", "/api/estado").status, 401)
+        self.assertEqual(self.pedir("GET", "/api/uso").status, 401)
+        self.assertEqual(self.pedir("PUT", "/api/estado", ESTADO, {"X-Flecha": "1"}).status, 401)
+        self.assertEqual(self.pedir("GET", "/?clave=incorrecta").status, 401)
+        self.assertEqual(self.pedir("GET", "/api/estado", encabezados={"X-Flecha-Clave": "incorrecta"}).status, 401)
+
+    def test_el_enlace_deja_una_cookie_y_limpia_la_url(self):
+        r = self.pedir("GET", f"/?clave={self.clave}")
+        self.assertEqual(r.status, 302)
+        self.assertEqual(r.getheader("Location"), "/")
+        galleta = r.getheader("Set-Cookie").split(";")[0]
+        self.assertEqual(self.pedir("GET", "/api/estado", encabezados={"Cookie": galleta}).status, 200)
+
+    def test_encabezado_para_la_app(self):
+        llave = {"X-Flecha-Clave": self.clave}
+        self.assertEqual(self.pedir("GET", "/api/estado", encabezados=llave).status, 200)
+        self.assertEqual(self.pedir("PUT", "/api/estado", ESTADO, {**llave, "X-Flecha": "1"}).status, 200)
+
+    def test_la_clave_se_conserva_entre_arranques(self):
+        self.assertEqual(servidor.clave_de_red(self.carpeta), self.clave)
+        self.assertEqual(oct((self.carpeta / "clave").stat().st_mode)[-3:], "600")
+
+
 if __name__ == "__main__":
     unittest.main()

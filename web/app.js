@@ -21,6 +21,9 @@
   const calmado = window.matchMedia('(prefers-reduced-motion: reduce)');
   const puente = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.flecha;
   const nativo = (tipo, extra) => puente && puente.postMessage({ tipo, ...extra });
+  // En iPhone y iPad la app guarda los datos y puede conectarse al servidor de tu Mac.
+  const movil = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.flechaDatos;
+  let conexion = (window.__flechaInicial && window.__flechaInicial.conexion) || { servidor: null, enLinea: false };
 
   let almacen = null;
   let estado = L.estadoVacio();
@@ -650,15 +653,20 @@
     ];
   }
 
+  function recibirUso(nuevo) {
+    const cambio = JSON.stringify(nuevo && nuevo.herramientas) !== JSON.stringify(uso && uso.herramientas);
+    uso = nuevo && Array.isArray(nuevo.herramientas) ? nuevo : null;
+    if (cambio && abierto && (vista.nombre === 'uso' || vista.nombre === 'lista') && !creando) pintar();
+  }
+
   async function cargarUso() {
-    if (!almacen || almacen.modo !== 'servidor') return;
+    if (!almacen) return;
+    // En la app de iPhone/iPad lo pide la parte nativa (al servidor de tu Mac) y llega por recibirUso.
+    if (almacen.modo === 'nativo') return movil.postMessage({ tipo: 'uso' });
+    if (almacen.modo !== 'servidor') return;
     try {
       const r = await fetch('api/uso', { headers: { 'X-Flecha': '1' }, cache: 'no-store' });
-      if (!r.ok) return;
-      const nuevo = await r.json();
-      const cambio = JSON.stringify(nuevo.herramientas) !== JSON.stringify(uso && uso.herramientas);
-      uso = nuevo;
-      if (cambio && abierto && (vista.nombre === 'uso' || vista.nombre === 'lista') && !creando) pintar();
+      if (r.ok) recibirUso(await r.json());
     } catch (error) {
       /* sin servidor no hay sección de uso */
     }
@@ -736,14 +744,30 @@
           h(
             'div',
             { class: 'acciones' },
-            !puente && h('button', { class: 'boton', type: 'button', onclick: exportar }, t('exportar')),
-            !puente && h('button', { class: 'boton', type: 'button', onclick: importar }, t('importar')),
+            !puente && !movil && h('button', { class: 'boton', type: 'button', onclick: exportar }, t('exportar')),
+            !puente && !movil && h('button', { class: 'boton', type: 'button', onclick: importar }, t('importar')),
             a.ejemplo && h('button', { class: 'boton', type: 'button', onclick: empezarDeCero }, t('empezarDeCero')),
           ),
-          h('p', { class: 'nota' }, [a.ejemplo && t('notaEjemplo'), t(almacen.modo === 'servidor' ? 'notaServidor' : 'notaLocal')].filter(Boolean).join(' ')),
+          h('p', { class: 'nota' }, [a.ejemplo && t('notaEjemplo'), t(notaDeDatos())].filter(Boolean).join(' ')),
         ),
+        movil &&
+          grupo(
+            t('tuMac'),
+            h(
+              'div',
+              { class: 'acciones' },
+              h('button', { class: 'boton', type: 'button', onclick: () => movil.postMessage({ tipo: conexion.servidor ? 'desconectar' : 'conectar' }) }, t(conexion.servidor ? 'desconectar' : 'conectar')),
+            ),
+            h('p', { class: 'nota' }, conexion.servidor ? `${t(conexion.enLinea ? 'macEnLinea' : 'macSinConexion')} ${conexion.servidor}` : t('notaConectar')),
+          ),
       ),
     ];
+  }
+
+  function notaDeDatos() {
+    if (almacen.modo === 'servidor') return 'notaServidor';
+    if (almacen.modo === 'nativo') return conexion.servidor ? 'notaNativaMac' : 'notaNativa';
+    return 'notaLocal';
   }
 
   function empezarDeCero() {
@@ -896,7 +920,28 @@
     }
   }
 
+  // Llega desde un toque en el widget: flecha://proyecto/<id>
+  function abrirProyecto(id) {
+    if (!estado.proyectos.some((p) => p.id === id)) return abrir();
+    if (abierto) return ir({ nombre: 'detalle', id });
+    vista = { nombre: 'detalle', id };
+    abrir();
+  }
+
   window.Flecha.cerrar = cerrar;
-  window.Flecha.abrir = abrir;
+  window.Flecha.abrir = () => abrir();
+  window.Flecha.abrirProyecto = abrirProyecto;
+  window.Flecha.abrirUso = () => {
+    if (!hayUso()) return abrir();
+    if (abierto) return ir({ nombre: 'uso' });
+    vista = { nombre: 'uso' };
+    abrir();
+  };
+  window.Flecha.recibirUso = recibirUso;
+  window.Flecha.recibirConexion = (nueva) => {
+    conexion = nueva || { servidor: null, enLinea: false };
+    if (!conexion.servidor) recibirUso(null);
+    if (abierto && vista.nombre === 'ajustes') pintar();
+  };
   arrancar();
 })();

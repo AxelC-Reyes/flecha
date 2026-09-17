@@ -32,7 +32,7 @@ Y eliges cómo usarlo:
 Solo necesita Python 3, que en macOS y Linux ya viene instalado. Abre Flecha en tu navegador y guarda tus datos en `~/.flecha/`.
 
 - `./flecha --ventana` lo abre en una ventana sin barras (Chrome, Edge o Brave).
-- `./flecha --red` lo comparte con tu red wifi para abrirlo desde el teléfono. Ojo: cualquiera en esa red puede verlo y editarlo.
+- `./flecha --red` lo comparte con tu red wifi para abrirlo desde el teléfono, con un enlace que lleva una clave.
 - `./flecha --datos otra/carpeta` o la variable `FLECHA_DIR` cambian dónde viven los JSON.
 
 ### 2. Widget flotante en macOS
@@ -43,7 +43,22 @@ mac/construir.sh --abrir
 
 Compila `mac/build/Flecha.app` (unos segundos; requiere `xcode-select --install`). La línea queda pegada al borde de tu pantalla, encima de todo, en todos los escritorios. Desde el ícono de la barra de menús puedes mandarla detrás de tus ventanas o salir. Para que arranque con tu Mac: Ajustes del Sistema → General → Ítems de inicio.
 
-### 3. Sin instalar nada (teléfono incluido)
+### 3. App y widgets para iPhone y iPad
+
+![Widgets de Avance y Uso en sus tres tamaños](capturas/widgets-ios.png)
+
+Necesitas una Mac con Xcode y una cuenta de Apple (la gratuita sirve; con ella la app hay que reinstalarla cada 7 días).
+
+1. Abre `ios/Flecha.xcodeproj` en Xcode.
+2. Crea `ios/Firma.local.xcconfig` con un prefijo tuyo y tu equipo (está explicado en `ios/Firma.xcconfig`), o elige tu equipo en *Signing & Capabilities* de los dos targets.
+3. Conecta tu iPhone o iPad, elígelo arriba y pulsa ▶.
+4. En la pantalla de inicio: mantén presionado → **＋** → Flecha. Hay dos widgets, **Avance** y **Uso**, en tamaño chico, mediano y grande.
+
+La app es la misma interfaz de siempre, y guarda sus datos en el dispositivo. Los widgets del sistema no pueden animarse, así que muestran el cuadro ya abierto; tocar un proyecto abre la app en sus faltantes.
+
+**Ver en el teléfono los proyectos de tu computadora** (y el widget de Uso): en la computadora corre `./flecha --red` y copia el enlace que imprime; en la app de Mac es el menú *Compartir con mi iPhone o iPad*, que lo copia por ti. En el teléfono: *Personalizar → Conectar con mi Mac* y pega el enlace. Deben estar en la misma red wifi; fuera de casa verás lo último que se sincronizó. El enlace lleva una clave: sin ella nadie más en tu red puede entrar (se guarda en `~/.flecha/clave`; bórrala para generar otra).
+
+### 4. Sin instalar nada (teléfono incluido)
 
 Abre `web/index.html` con doble clic, o publica la carpeta `web/` en cualquier hosting estático (este repo trae un flujo para GitHub Pages). En iPhone y Android: *Compartir → Agregar a pantalla de inicio* y se comporta como app, incluso sin conexión. En este modo los datos viven en el navegador; usa *Personalizar → Exportar* para respaldarlos.
 
@@ -100,13 +115,14 @@ El avance de un proyecto es `hecho / (hecho + pendiente)`, contando tareas (o su
 | Plataforma | Hoy | Falta |
 | --- | --- | --- |
 | macOS | Widget flotante nativo + web | Desenfoque a la medida del cuadrado |
-| iOS / Android | Web app en pantalla de inicio | Widget de inicio (WidgetKit / Glance). Los widgets del sistema son estáticos: mostrarían las barras y al tocarlos abrirían la app |
+| iPhone / iPad | App nativa + widgets de Avance y Uso (`ios/`) | Marcar tareas desde el widget; sincronizar por iCloud en vez de la red local |
+| Android | Web app en pantalla de inicio | Widget de inicio (Glance) |
 | Windows | Web, ventana con `--ventana` | Widget del panel de Windows 11 vía PWA |
 | Linux | Web, ventana con `--ventana` | Applet de bandeja o plasmoide. Se aceptan manos |
 
 ## Desarrollo
 
-No hay paso de compilación: HTML, CSS y JavaScript a mano en `web/`, y un servidor de un solo archivo con la biblioteca estándar de Python.
+No hay paso de compilación: HTML, CSS y JavaScript a mano en `web/`, y un servidor de un solo archivo con la biblioteca estándar de Python. Las apps de Mac (`mac/`) e iOS (`ios/`) son cascarones nativos que muestran esa misma carpeta `web/`. El proyecto de Xcode se regenera con `xcodegen` dentro de `ios/` si cambias `project.yml`.
 
 ```sh
 node --test pruebas/                      # lógica (avance, completar, revertir)

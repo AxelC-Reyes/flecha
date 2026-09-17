@@ -1,5 +1,6 @@
-// Dónde vive el estado. Dos modos, elegidos solos al arrancar:
+// Dónde vive el estado. Tres modos, elegidos solos al arrancar:
 //   servidor  hay un `servidor.py` detrás: los datos son archivos JSON en tu computadora.
+//   nativo    dentro de la app de iPhone/iPad: la app guarda el archivo (y lo comparte con el widget).
 //   local     página estática (GitHub Pages, doble clic): los datos viven en localStorage.
 
 (function (raiz) {
@@ -115,8 +116,25 @@
     };
   }
 
+  // La app nativa entrega el estado inicial en `__flechaInicial` y recibe cada cambio
+  // por su puente. Ella decide si el archivo es local o el de tu Mac.
+  function almacenNativo(puente, avisos) {
+    const inicial = raiz.__flechaInicial || {};
+    raiz.Flecha.recibir = (crudo) => avisos.externo(conEjemplo(L.normalizar(crudo))) !== false;
+    raiz.Flecha.falloGuardar = () => avisos.fallo();
+    return {
+      modo: 'nativo',
+      estado: conEjemplo(L.normalizar(inicial.estado)),
+      guardar(estado) {
+        puente.postMessage({ tipo: 'guardar', estado });
+      },
+    };
+  }
+
   // avisos: { externo(estado) -> false si no pudo aplicarlo, fallo() }
   async function abrir(avisos) {
+    const nativo = raiz.webkit && raiz.webkit.messageHandlers && raiz.webkit.messageHandlers.flechaDatos;
+    if (nativo) return almacenNativo(nativo, avisos);
     if (location.protocol.startsWith('http')) {
       try {
         const r = await fetch(RUTA, { headers: ENCABEZADOS, cache: 'no-store' });
