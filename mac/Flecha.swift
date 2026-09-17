@@ -82,17 +82,16 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.delegate = self
 
-        // Detrás de la página, un desenfoque real de lo que haya en pantalla. Solo se
-        // enciende al abrir. macOS no acepta máscaras con degradado para este efecto,
-        // así que el desvanecido hacia dentro se arma con franjas cada vez más tenues.
-        desenfoque = NSView()
+        // Detrás de la página va un solo panel de cristal, del tamaño exacto del cuadro
+        // y sus barras (la página manda esa zona). Así todo se lee igual sobre una
+        // ventana blanca que sobre una negra, sin franjas ni degradados sucios.
+        desenfoque = crearCristal()
         desenfoque.alphaValue = 0
         let fondo = NSView()
-        for vista in [desenfoque!, web!] as [NSView] {
-            vista.frame = fondo.bounds
-            vista.autoresizingMask = [.width, .height]
-            fondo.addSubview(vista)
-        }
+        fondo.addSubview(desenfoque)
+        web.frame = fondo.bounds
+        web.autoresizingMask = [.width, .height]
+        fondo.addSubview(web)
         panel.contentView = fondo
         aplicarNivel()
         panel.orderFrontRegardless()
@@ -197,32 +196,61 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
     @objc private func recolocar() {
         let destino = marco(expandido: expandido)
         panel.setFrame(destino, display: true)
-        if expandido { armarDesenfoque(destino.size) }
     }
 
-    private func franja(_ area: NSRect, opacidad: CGFloat) -> NSVisualEffectView {
-        let vista = NSVisualEffectView(frame: area)
-        vista.material = .fullScreenUI
-        vista.blendingMode = .behindWindow
-        vista.state = .active
-        vista.alphaValue = opacidad
-        return vista
+    private func crearCristal() -> NSView {
+        if #available(macOS 26.0, *) {
+            let cristal = NSGlassEffectView()
+            cristal.cornerRadius = 38
+            return cristal
+        }
+        let clasico = NSVisualEffectView()
+        clasico.material = .hudWindow
+        clasico.blendingMode = .behindWindow
+        clasico.state = .active
+        clasico.wantsLayer = true
+        clasico.maskImage = Self.mascaraRedonda(radio: 38)
+        return clasico
     }
 
-    // Sólido junto al borde de la pantalla; de la mitad hacia dentro se va apagando.
-    private func armarDesenfoque(_ tamano: NSSize) {
-        desenfoque.subviews.forEach { $0.removeFromSuperview() }
-        let derecha = lado == "derecha"
-        let solido = (tamano.width * 0.5).rounded()
-        let pasos = 28
-        let ancho = (tamano.width - solido) / CGFloat(pasos)
-        let x = { (desde: CGFloat, w: CGFloat) in derecha ? tamano.width - desde - w : desde }
-        desenfoque.addSubview(franja(NSRect(x: x(0, solido), y: 0, width: solido, height: tamano.height), opacidad: 1))
-        for i in 0..<pasos {
-            let avance = (CGFloat(i) + 0.5) / CGFloat(pasos)
-            let opacidad = pow(1 - avance, 1.6)
-            let desde = solido + CGFloat(i) * ancho
-            desenfoque.addSubview(franja(NSRect(x: x(desde, ancho), y: 0, width: ancho, height: tamano.height), opacidad: opacidad))
+    /// Máscara estirable con esquinas redondas para el efecto clásico (macOS 12 a 15).
+    private static func mascaraRedonda(radio: CGFloat) -> NSImage {
+        let lado = radio * 2 + 1
+        let imagen = NSImage(size: NSSize(width: lado, height: lado), flipped: false) { area in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: area, xRadius: radio, yRadius: radio).fill()
+            return true
+        }
+        imagen.capInsets = NSEdgeInsets(top: radio, left: radio, bottom: radio, right: radio)
+        imagen.resizingMode = .stretch
+        return imagen
+    }
+
+    /// En oscuro, un velo negro sobre el cristal para que las letras blancas conserven
+    /// contraste aunque detrás haya una ventana blanca.
+    private func entintarCristal() {
+        guard #available(macOS 26.0, *), let cristal = desenfoque as? NSGlassEffectView else { return }
+        let oscuro = panel.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        cristal.tintColor = oscuro ? NSColor.black.withAlphaComponent(0.32) : nil
+    }
+
+    /// La página avisa qué rectángulo ocupa (en sus coordenadas, con el origen arriba).
+    private func acomodarCristal(_ cuerpo: [String: Any]) {
+        guard expandido, let fondo = panel.contentView,
+              let x = cuerpo["x"] as? Double, let y = cuerpo["y"] as? Double,
+              let ancho = cuerpo["ancho"] as? Double, let alto = cuerpo["alto"] as? Double
+        else { return }
+        let marco = NSRect(x: x, y: Double(fondo.bounds.height) - y - alto, width: ancho, height: alto)
+        if desenfoque.alphaValue == 0 {
+            entintarCristal()
+            desenfoque.frame = marco
+            return desvanecer(a: 1, en: 0.35)
+        }
+        NSAnimationContext.runAnimationGroup { contexto in
+            contexto.duration = 0.5
+            contexto.timingFunction = CAMediaTimingFunction(controlPoints: 0.32, 0.72, 0, 1)
+            contexto.allowsImplicitAnimation = true
+            desenfoque.animator().frame = marco
         }
     }
 
@@ -243,9 +271,10 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
             recolocar()
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
-            desvanecer(a: 1, en: 0.45)
+        case "zona":
+            acomodarCristal(cuerpo)
         case "cerrando":
-            desvanecer(a: 0, en: 0.3)
+            desvanecer(a: 0, en: 0.18)
         case "contraer":
             expandido = false
             desenfoque.alphaValue = 0

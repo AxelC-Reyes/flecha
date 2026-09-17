@@ -206,9 +206,34 @@
     const tope = conBarras() ? 'none' : `${Math.max(220, libre - (vista.nombre === 'detalle' ? 30 : 0))}px`;
     widget.style.setProperty('--tope', tope);
     widget.style.setProperty('--alto', `${contenido.offsetHeight}px`);
+    zonaNativa();
   }
 
   const conBarras = () => vista.nombre === 'lista' || vista.nombre === 'uso';
+
+  // Solo en la app de Mac: el rectángulo final del cuadro con sus barras, para que la
+  // parte nativa ponga el panel de cristal exactamente detrás. Se calcula (no se mide)
+  // porque el cuadro todavía está a media animación cuando hace falta.
+  function zonaNativa() {
+    if (!puente || !abierto) return;
+    const MARGEN = 12;
+    const CORRIMIENTO = 14; // el translateX de .nativo .widget.abierto
+    const estilo = getComputedStyle(escena);
+    const orilla = parseFloat(estilo.paddingLeft);
+    const ancho = contenido.offsetWidth;
+    const cimaAlto = vista.nombre === 'detalle' ? 30 : 0;
+    const alto = contenido.offsetHeight + cimaAlto;
+    let total = ancho;
+    if (conBarras()) {
+      const columna = escena.clientWidth - orilla * 2 - ancho - 10;
+      const grosor = parseFloat(getComputedStyle(html).getPropertyValue('--grosor')) || 12;
+      const mayor = Math.max(0, ...filasDeBarras().map((f) => f.fraccion));
+      total += 10 + Math.max(grosor, mayor * (columna - 50)) + 8 + 40;
+    }
+    const arriba = Math.max(parseFloat(estilo.paddingTop), (escena.clientHeight - alto) / 2);
+    const izquierda = estado.ajustes.lado === 'derecha' ? escena.clientWidth - orilla - CORRIMIENTO - total : orilla + CORRIMIENTO;
+    nativo('zona', { x: izquierda - MARGEN, y: arriba - MARGEN, ancho: total + MARGEN * 2, alto: alto + MARGEN * 2 });
+  }
 
   function crecer(campo) {
     if (window.CSS && CSS.supports('field-sizing', 'content')) return;
@@ -825,6 +850,7 @@
       if (!abierto) return;
       pintar(true);
       widget.classList.add('abierto');
+      zonaNativa();
       if (conTeclado) contenido.querySelector('button')?.focus({ preventScroll: true });
     }, puente ? 70 : 0);
   }

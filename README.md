@@ -114,7 +114,7 @@ El avance de un proyecto es `hecho / (hecho + pendiente)`, contando tareas (o su
 
 | Plataforma | Hoy | Falta |
 | --- | --- | --- |
-| macOS | Widget flotante nativo + web | Desenfoque a la medida del cuadrado |
+| macOS | Widget flotante nativo (panel de cristal en macOS 26, desenfoque clásico en versiones anteriores) + web | Atajo de teclado global |
 | iPhone / iPad | App nativa + widgets de Avance y Uso (`ios/`) | Marcar tareas desde el widget; sincronizar por iCloud en vez de la red local |
 | Android | Web app en pantalla de inicio | Widget de inicio (Glance) |
 | Windows | Web, ventana con `--ventana` | Widget del panel de Windows 11 vía PWA |

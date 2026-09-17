@@ -137,20 +137,12 @@ button {
 
 .nativo .escena { padding: 12px 8px; }
 
-/* En la app nativa no hay fondo propio: al abrir, un velo nace del borde de la
-   pantalla para que barras y cifras se lean sobre cualquier ventana. */
-.nativo .escena::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(to right, color-mix(in srgb, var(--fondo) 50%, transparent) 0%, color-mix(in srgb, var(--fondo) 38%, transparent) 60%, transparent 100%);
-  transition: opacity 0.3s ease;
-}
-.nativo.derecha .escena::before { transform: scaleX(-1); }
-.nativo .escena:has(.abierto)::before { opacity: 1; transition: opacity 0.5s ease 0.1s; }
-.nativo .pct { text-shadow: 0 0 10px var(--fondo), 0 0 3px var(--fondo); }
+/* En la app de Mac no hay fondo propio: al abrir, la parte nativa pone un panel de
+   cristal justo detrás del cuadro y sus barras (ver zonaNativa en app.js). El
+   contenido se separa un poco del borde de la pantalla para que el panel respire. */
+.nativo .widget { transition: opacity 0.4s ease, transform 0.55s var(--curva); }
+.nativo .widget.abierto { transform: translateX(14px); }
+.nativo.derecha .widget.abierto { transform: translateX(-14px); }
 
 .widget {
   width: min(100%, 520px);
