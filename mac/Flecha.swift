@@ -123,7 +123,7 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
         menu.addItem(.separator())
         let compartir = menu.addItem(withTitle: "Compartir con mi iPhone o iPad", action: #selector(alternarRed), keyEquivalent: "")
         compartir.state = enRed ? .on : .off
-        menu.addItem(withTitle: "Copiar enlace para el teléfono", action: #selector(copiarEnlace), keyEquivalent: "")
+        menu.addItem(withTitle: "Código para el teléfono", action: #selector(copiarEnlace), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Salir de Flecha", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         for item in menu.items where item.action != #selector(NSApplication.terminate(_:)) { item.target = self }
@@ -351,20 +351,23 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
     }
 
     @objc private func copiarEnlace() {
-        var pedido = URLRequest(url: base.appendingPathComponent("api/enlace"))
+        var pedido = URLRequest(url: base.appendingPathComponent("api/emparejar"))
         pedido.timeoutInterval = 2
         URLSession.shared.dataTask(with: pedido) { datos, _, _ in
             let respuesta = datos.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+            let codigo = respuesta?["codigo"] as? String
             let enlace = respuesta?["url"] as? String
             DispatchQueue.main.async {
-                guard let enlace else {
-                    return self.avisar("Todavía no hay enlace",
+                guard let codigo else {
+                    return self.avisar("Todavía no se puede",
                                        "Activa primero \"Compartir con mi iPhone o iPad\" y revisa que esta Mac esté conectada a una red.")
                 }
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(enlace, forType: .string)
-                self.avisar("Enlace copiado",
-                            "Pégalo en la app de Flecha de tu iPhone o iPad (Personalizar → Conectar con mi Mac), o ábrelo en su navegador. Lleva una clave: compártelo solo con tus dispositivos.\n\n\(enlace)")
+                if let enlace {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(enlace, forType: .string)
+                }
+                self.avisar("Código: \(codigo.prefix(3)) \(codigo.suffix(3))",
+                            "En el iPhone o iPad: Flecha → engrane → toca esta Mac y escribe el código. Vale 10 minutos. Los dos deben estar en la misma red wifi.\n\nSi la app no encuentra la Mac, el enlace con clave ya quedó copiado para pegarlo ahí.")
             }
         }.resume()
     }

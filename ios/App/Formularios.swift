@@ -157,9 +157,14 @@ struct FormularioRutina: View {
 struct AjustesView: View {
     @EnvironmentObject private var tienda: Tienda
     @Environment(\.dismiss) private var cerrar
+    @StateObject private var buscador = Buscador()
+    @State private var elegida: MacEncontrada?
+    @State private var codigo = ""
     @State private var enlace = ""
     @State private var conectando = false
     @State private var error: String?
+    @State private var pegarEnlace = false
+    @FocusState private var enCodigo: Bool
 
     var body: some View {
         NavigationStack {
@@ -173,30 +178,69 @@ struct AjustesView: View {
                         }
                         Button(texto("Desconectar", "Disconnect"), role: .destructive) { tienda.desconectar() }
                     } header: {
-                        Text(texto("Tu Mac", "Your Mac"))
+                        Text(texto("Tu computadora", "Your computer"))
                     } footer: {
                         Text(texto("Ves y editas los mismos proyectos que en tu computadora. Fuera de casa puedes seguir palomeando: los cambios se entregan cuando vuelvas a su red.",
                                    "You see and edit the same projects as on your computer. Away from home you can keep checking things off: changes are delivered when you're back on its network."))
                     }
                 } else {
                     Section {
-                        TextField("http://192.168.1.5:4747/?clave=…", text: $enlace)
-                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        Button(conectando ? texto("Buscando tu Mac…", "Looking for your Mac…") : texto("Conectar", "Connect")) {
-                            conectando = true
-                            Task {
-                                error = await tienda.conectar(enlace)
-                                conectando = false
-                                if error == nil { enlace = "" }
+                        if buscador.macs.isEmpty {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                Text(texto("Buscando en tu red wifi…", "Looking on your Wi-Fi…")).foregroundStyle(.secondary)
                             }
                         }
-                        .disabled(conectando || enlace.isEmpty)
+                        ForEach(buscador.macs) { mac in
+                            Button {
+                                elegida = mac
+                                error = nil
+                                enCodigo = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "desktopcomputer")
+                                    Text(mac.nombre)
+                                    Spacer()
+                                    if elegida == mac { Image(systemName: "checkmark").foregroundStyle(tienda.apariencia.acento) }
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                        if let elegida {
+                            TextField(texto("Código de 6 dígitos", "6-digit code"), text: $codigo)
+                                .keyboardType(.numberPad)
+                                .focused($enCodigo)
+                                .font(.system(size: 22, weight: .semibold, design: .rounded).monospacedDigit())
+                                .onChange(of: codigo) { _, nuevo in
+                                    let digitos = String(nuevo.filter(\.isNumber).prefix(6))
+                                    if digitos != nuevo { codigo = digitos }
+                                    if digitos.count == 6 { emparejar(elegida) }
+                                }
+                        }
+                        if conectando { ProgressView() }
                         if let error { Text(error).font(.footnote).foregroundStyle(.red) }
                     } header: {
-                        Text(texto("Conectar con tu Mac", "Connect to your Mac"))
+                        Text(texto("Conectar con tu computadora", "Connect to your computer"))
                     } footer: {
-                        Text(texto("En tu Mac: ícono de Flecha en la barra de menús → Compartir con mi iPhone o iPad (o corre ./flecha --red). Pega aquí el enlace que te da. Deben estar en la misma red wifi. Sin conectar, tus datos viven solo en este dispositivo.",
-                                   "On your Mac: Flecha's menu bar icon → Share with my iPhone or iPad (or run ./flecha --red). Paste the link here. Both must be on the same Wi-Fi. Without connecting, your data lives only on this device."))
+                        Text(texto("En tu computadora: ícono de Flecha en la barra de menús → Compartir con mi iPhone o iPad → Código para el teléfono (o en la terminal: ./flecha --red). Toca tu computadora aquí y escribe el código. Deben estar en la misma red wifi.",
+                                   "On your computer: Flecha's menu bar icon → Share with my iPhone or iPad → Code for the phone (or in the terminal: ./flecha --red). Tap your computer here and type the code. Both must be on the same Wi-Fi."))
+                    }
+                    Section {
+                        DisclosureGroup(texto("No aparece mi computadora", "My computer doesn't show up"), isExpanded: $pegarEnlace) {
+                            TextField("http://192.168.1.5:4747/?clave=…", text: $enlace)
+                                .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            Button(texto("Conectar con el enlace", "Connect with the link")) {
+                                conectando = true
+                                Task {
+                                    error = await tienda.conectar(enlace)
+                                    conectando = false
+                                }
+                            }
+                            .disabled(conectando || enlace.isEmpty)
+                        }
+                    } footer: {
+                        Text(texto("El enlace lo imprime ./flecha --red, y la app de Mac lo copia al portapapeles junto con el código. Sin conectar, tus datos viven solo en este dispositivo.",
+                                   "./flecha --red prints the link, and the Mac app copies it to the clipboard along with the code. Without connecting, your data lives only on this device."))
                     }
                 }
                 Section {
@@ -209,7 +253,33 @@ struct AjustesView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(texto("Listo", "Done")) { cerrar() } } }
             .onAppear {
+                if tienda.conexion == nil { buscador.empezar() }
                 if let pegado = UIPasteboard.general.string, pegado.contains("clave="), Conexion(enlace: pegado) != nil { enlace = pegado }
+            }
+            .onDisappear { buscador.parar() }
+        }
+    }
+
+    private func emparejar(_ mac: MacEncontrada) {
+        guard !conectando else { return }
+        conectando = true
+        error = nil
+        Task {
+            defer { conectando = false }
+            guard let base = await Buscador.direccion(de: mac) else {
+                error = texto("No pude llegar a esa computadora. Revisa que sigan en la misma red.", "Couldn't reach that computer. Check you're still on the same network.")
+                return
+            }
+            do {
+                let conexion = try await Cliente.emparejar(base, codigo: codigo)
+                try await Sincronia.conectar(conexion)
+                tienda.recargar()
+                codigo = ""
+            } catch Cliente.Falla.rechazado(403) {
+                error = texto("Código incorrecto o vencido. Pide otro en la computadora.", "Wrong or expired code. Ask the computer for a new one.")
+                codigo = ""
+            } catch {
+                self.error = texto("No se pudo conectar. Inténtalo de nuevo.", "Couldn't connect. Try again.")
             }
         }
     }

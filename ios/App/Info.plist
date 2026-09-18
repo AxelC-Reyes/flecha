@@ -42,8 +42,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_flecha._tcp</string>
+	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Flecha se conecta al servidor de Flecha en tu Mac para mostrar tus proyectos.</string>
+	<string>Para encontrar tu computadora en tu red wifi y mostrar los mismos proyectos que tienes en ella.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

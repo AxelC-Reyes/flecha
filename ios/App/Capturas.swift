@@ -27,6 +27,25 @@ enum Capturas {
                 if let primera = tienda.estado.resumen().rutinas.first { tienda.sumar(primera.rutina, de: primera.proyecto) }
             }
         }
+        if let i = argumentos.firstIndex(of: "--emparejar"), argumentos.count > i + 1 {
+            // Prueba de punta a punta del emparejamiento: busca la computadora por Bonjour y usa el código.
+            let codigo = argumentos[i + 1]
+            let buscador = Buscador()
+            buscador.empezar()
+            Task {
+                for _ in 0..<40 where buscador.macs.isEmpty { try? await Task.sleep(for: .milliseconds(250)) }
+                guard let mac = buscador.macs.first else { return print("Emparejar: no se encontró ninguna computadora") }
+                guard let base = await Buscador.direccion(de: mac) else { return print("Emparejar: sin dirección para \(mac.nombre)") }
+                do {
+                    let conexion = try await Cliente.emparejar(base, codigo: codigo)
+                    try await Sincronia.conectar(conexion)
+                    tienda.recargar()
+                    print("Emparejar: conectado con \(mac.nombre) en \(base)")
+                } catch {
+                    print("Emparejar: falló \(error)")
+                }
+            }
+        }
         guard argumentos.contains("--capturas") else { return }
         let carpeta = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("capturas")
         try? FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)

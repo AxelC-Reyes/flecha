@@ -136,7 +136,7 @@ class PruebaRed(unittest.TestCase):
         datos = json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None
         conexion.request(metodo, ruta, body=datos, headers=encabezados or {})
         respuesta = conexion.getresponse()
-        respuesta.read()
+        respuesta.cuerpo = respuesta.read()
         conexion.close()
         return respuesta
 
@@ -159,6 +159,26 @@ class PruebaRed(unittest.TestCase):
         llave = {"X-Flecha-Clave": self.clave}
         self.assertEqual(self.pedir("GET", "/api/estado", encabezados=llave).status, 200)
         self.assertEqual(self.pedir("PUT", "/api/estado", ESTADO, {**llave, "X-Flecha": "1"}).status, 200)
+
+    def test_emparejar_con_codigo(self):
+        codigo = self.servidor.RequestHandlerClass.emparejador.nuevo()[0]
+        for malo in ("000000", "12345"):
+            self.assertEqual(self.pedir("POST", "/api/emparejar", {"codigo": malo}).status, 403)
+        r = self.pedir("POST", "/api/emparejar", {"codigo": codigo[:3] + " " + codigo[3:]})
+        self.assertEqual(r.status, 200)
+        # el mismo código ya no sirve
+        self.assertEqual(self.pedir("POST", "/api/emparejar", {"codigo": codigo}).status, 403)
+
+    def test_el_codigo_se_agota_con_intentos(self):
+        emparejador = self.servidor.RequestHandlerClass.emparejador
+        codigo = emparejador.nuevo()[0]
+        for _ in range(5):
+            self.assertFalse(emparejador.validar("999999"))
+        self.assertFalse(emparejador.validar(codigo))
+        emparejador.vence = 0
+        emparejador.nuevo()
+        emparejador.vence = 0
+        self.assertFalse(emparejador.validar(emparejador.codigo or ""))
 
     def test_la_clave_se_conserva_entre_arranques(self):
         self.assertEqual(servidor.clave_de_red(self.carpeta), self.clave)

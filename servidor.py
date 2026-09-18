@@ -20,6 +20,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -143,6 +144,7 @@ class Manejador(BaseHTTPRequestHandler):
     uso = None
     anfitriones = None  # None = cualquiera (modo --red)
     clave = None  # con --red: lo que deben presentar los demás dispositivos
+    emparejador = None
     clave_siempre = False  # solo para pruebas: exigirla también a esta computadora
 
     def log_message(self, formato, *args):
@@ -227,6 +229,8 @@ class Manejador(BaseHTTPRequestHandler):
         ruta = self.path.split("?", 1)[0].split("#", 1)[0]
         if ruta == "/api/enlace":
             return self._enlace()
+        if ruta == "/api/emparejar":
+            return self._codigo()
         if ruta == "/api/estado":
             return self._leer_estado()
         if ruta == "/api/uso":
@@ -236,6 +240,24 @@ class Manejador(BaseHTTPRequestHandler):
         return self._archivo(ruta)
 
     do_HEAD = do_GET
+
+    def do_POST(self):
+        """Emparejar un teléfono: trae el código de 6 dígitos y recibe la clave. Solo con --red."""
+        if not self._anfitrion_valido() or not self._origen_valido():
+            return self._responder(HTTPStatus.FORBIDDEN, b"Origen no permitido")
+        if self.path.split("?", 1)[0] != "/api/emparejar":
+            return self._json(HTTPStatus.NOT_FOUND, {"error": "no existe"})
+        if self.clave is None:
+            return self._json(HTTPStatus.FORBIDDEN, {"error": "el servidor no está compartido en la red"})
+        try:
+            largo = int(self.headers.get("Content-Length", "0"))
+            cuerpo = json.loads(self.rfile.read(min(max(largo, 0), 4096)).decode("utf-8"))
+            codigo = str(cuerpo.get("codigo", "")).replace(" ", "")
+        except (ValueError, AttributeError, UnicodeDecodeError):
+            return self._json(HTTPStatus.BAD_REQUEST, {"error": "falta el código"})
+        if not self.emparejador.validar(codigo):
+            return self._json(HTTPStatus.FORBIDDEN, {"error": "código incorrecto o vencido"})
+        self._json(HTTPStatus.OK, {"clave": self.clave, "nombre": socket.gethostname().split(".")[0]})
 
     def do_PUT(self):
         if not self._anfitrion_valido() or not self._origen_valido():
@@ -265,6 +287,15 @@ class Manejador(BaseHTTPRequestHandler):
         if huella is None:
             return self._json(HTTPStatus.CONFLICT, {"error": "el archivo cambió por fuera"})
         self._json(HTTPStatus.OK, {"ok": True}, {"ETag": huella})
+
+    def _codigo(self):
+        """Un código nuevo para emparejar un teléfono. Solo se le entrega a esta misma computadora."""
+        if not self._es_esta_maquina():
+            return self._json(HTTPStatus.FORBIDDEN, {"error": "solo desde esta computadora"})
+        if self.clave is None:
+            return self._json(HTTPStatus.OK, {"red": False, "codigo": None})
+        codigo, vence = self.emparejador.nuevo()
+        self._json(HTTPStatus.OK, {"red": True, "codigo": codigo, "vence": vence, "url": enlace_red(self.server.server_address[1], self.clave)})
 
     def _enlace(self):
         """El enlace para el teléfono. Solo se le entrega a esta misma computadora."""
@@ -299,6 +330,52 @@ def ip_local():
         return None
 
 
+class Emparejador:
+    """Códigos de 6 dígitos, de 10 minutos y 5 intentos, para que un teléfono reciba la clave."""
+
+    def __init__(self):
+        self.codigo = None
+        self.vence = 0
+        self.intentos = 0
+        self.candado = threading.Lock()
+
+    def nuevo(self):
+        with self.candado:
+            self.codigo = "".join(secrets.choice("0123456789") for _ in range(6))
+            self.vence = time.time() + 600
+            self.intentos = 0
+            return self.codigo, self.vence
+
+    def validar(self, presentado):
+        with self.candado:
+            if not self.codigo or time.time() > self.vence:
+                return False
+            self.intentos += 1
+            if self.intentos > 5:
+                self.codigo = None
+                return False
+            if not hmac.compare_digest(presentado, self.codigo):
+                return False
+            self.codigo = None  # cada código sirve una sola vez
+            return True
+
+
+def anunciar_en_red(puerto):
+    """Que el teléfono encuentre esta computadora solo (Bonjour), si el sistema lo permite."""
+    nombre = f"Flecha en {socket.gethostname().split('.')[0]}"
+    ordenes = [
+        ["dns-sd", "-R", nombre, "_flecha._tcp", "local", str(puerto)],
+        ["avahi-publish-service", nombre, "_flecha._tcp", str(puerto)],
+    ]
+    for orden in ordenes:
+        if shutil.which(orden[0]):
+            try:
+                return subprocess.Popen(orden, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                continue
+    return None
+
+
 def clave_de_red(carpeta):
     """La clave vive en <datos>/clave. Bórrala para generar otra y desconectar a todos."""
     ruta = Path(carpeta) / "clave"
@@ -326,6 +403,7 @@ def crear_servidor(carpeta, puerto=PUERTO, red=False, ruidoso=False, casa=None):
     manejador = type("ManejadorFlecha", (Manejador,), {})
     manejador.almacen = Almacen(carpeta)
     manejador.clave = clave_de_red(carpeta) if red else None
+    manejador.emparejador = Emparejador()
     manejador.uso = Uso(carpeta, casa)
     servidor = ThreadingHTTPServer(("0.0.0.0" if red else "127.0.0.1", puerto), manejador)
     servidor.daemon_threads = True
@@ -405,7 +483,25 @@ def vigilar_padre(servidor):
     threading.Thread(target=ronda, daemon=True).start()
 
 
+def pedir_codigo(puerto):
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{puerto}/api/emparejar", timeout=3) as respuesta:
+            datos = json.load(respuesta)
+    except (OSError, ValueError):
+        print(f"No hay un Flecha corriendo en el puerto {puerto}. Arráncalo con ./flecha --red.", file=sys.stderr)
+        return 1
+    if not datos.get("codigo"):
+        print("Ese Flecha no está compartido en la red. Arráncalo con ./flecha --red.", file=sys.stderr)
+        return 1
+    print(f"Código para la app del teléfono: {datos['codigo'][:3]} {datos['codigo'][3:]}   (vale 10 minutos)")
+    return 0
+
+
 def main(argv=None):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)  # que el enlace y el código salgan al instante
     p = argparse.ArgumentParser(prog="flecha", description="Tus proyectos y su avance, en una línea.")
     p.add_argument("--puerto", type=int, default=int(os.environ.get("FLECHA_PUERTO", PUERTO)))
     p.add_argument("--datos", help="carpeta de los JSON (por defecto ~/.flecha o $FLECHA_DIR)")
@@ -414,10 +510,13 @@ def main(argv=None):
     p.add_argument("--sin-abrir", action="store_true", help="no abre el navegador")
     p.add_argument("--ruidoso", action="store_true", help="muestra cada petición")
     p.add_argument("--con-padre", action="store_true", help=argparse.SUPPRESS)  # lo usa la app de Mac: salir si ella muere
+    p.add_argument("--codigo", action="store_true", help="pide un código nuevo para emparejar el teléfono al servidor que ya corre, y termina")
     p.add_argument("--conectar-claude", action="store_true", help="conecta los límites de Claude Code con la sección Uso, y termina")
     args = p.parse_args(argv)
     if args.conectar_claude:
         return conectar_claude()
+    if args.codigo:
+        return pedir_codigo(args.puerto)
 
     carpeta = carpeta_datos(args.datos)
     try:
@@ -434,6 +533,9 @@ def main(argv=None):
         enlace = enlace_red(servidor.server_address[1], servidor.RequestHandlerClass.clave)
         print(f"En tu red  {enlace or '(no encontré la IP de esta computadora)'}")
         print("Ese enlace lleva una clave: ábrelo en tu teléfono, o pégalo en la app de Flecha.")
+        codigo, _ = servidor.RequestHandlerClass.emparejador.nuevo()
+        print(f"Código para la app del teléfono: {codigo[:3]} {codigo[3:]}   (vale 10 minutos; ./flecha --codigo da otro)")
+        anuncio = anunciar_en_red(servidor.server_address[1])
         print(f"Para cambiarla, borra {carpeta / 'clave'} y vuelve a arrancar.")
     print("Ctrl+C para salir.")
 
@@ -448,6 +550,8 @@ def main(argv=None):
         print()
     finally:
         servidor.server_close()
+        if args.red and anuncio:
+            anuncio.terminate()
     return 0
 
 

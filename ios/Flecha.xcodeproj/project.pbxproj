@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		08C2E6B39E63B8809A61FC22 /* Cliente.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70C9EAD566F20F1D98BBCE92 /* Cliente.swift */; };
+		0C3926B7DE9D18B0A1F39055 /* Buscador.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5A64946F022F3AD11F24B30 /* Buscador.swift */; };
 		1E32CCE14BA0030C3CA627F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2099EC943B86F1B0CB5228B8 /* Assets.xcassets */; };
 		2199323C5A26CEE074FF8106 /* Sincronia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71C9DED947DF477E4D6ACAD8 /* Sincronia.swift */; };
 		4CCFD7F042FC73E3932E02AB /* Pantallas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B207BD753958FD191F8C79B /* Pantallas.swift */; };
@@ -74,9 +75,10 @@
 		D0C43392FCDE9441FF19C01D /* Vistas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vistas.swift; sourceTree = "<group>"; };
 		D2EB19A8C4F3FB2ADF27746D /* FlechaWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlechaWidget.entitlements; sourceTree = "<group>"; };
 		D42950777E7A3EF3C7F4F315 /* Intenciones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intenciones.swift; sourceTree = "<group>"; };
+		E5A64946F022F3AD11F24B30 /* Buscador.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Buscador.swift; sourceTree = "<group>"; };
 		F40F82F52D7E5662C15B14B2 /* Formularios.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formularios.swift; sourceTree = "<group>"; };
 		FA4E88F762F9B236BFD54569 /* Almacen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Almacen.swift; sourceTree = "<group>"; };
-		"TEMP_CC734B61-1451-4E37-ACB9-D94ACEC35E9D" /* Firma.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Firma.xcconfig; sourceTree = "<group>"; };
+		"TEMP_9C307E46-2809-4BF4-8350-51F30C69C17E" /* Firma.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Firma.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -104,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				2099EC943B86F1B0CB5228B8 /* Assets.xcassets */,
+				E5A64946F022F3AD11F24B30 /* Buscador.swift */,
 				4CC40B30EADAA08C3941DDBD /* Capturas.swift */,
 				ACAF851980DF4E33D83A17C9 /* Componentes.swift */,
 				3241F34B9B9FAB02576EDF30 /* Flecha.entitlements */,
@@ -138,10 +141,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		"TEMP_55827683-AC80-45F4-BDEE-A428CC2BACA7" /* ios */ = {
+		"TEMP_32A67EC5-0781-45C5-BCF5-934A470179F3" /* ios */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_CC734B61-1451-4E37-ACB9-D94ACEC35E9D" /* Firma.xcconfig */,
+				"TEMP_9C307E46-2809-4BF4-8350-51F30C69C17E" /* Firma.xcconfig */,
 			);
 			path = ios;
 			sourceTree = "<group>";
@@ -257,6 +260,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B54567E762CEBC6CE7238A1C /* Almacen.swift in Sources */,
+				0C3926B7DE9D18B0A1F39055 /* Buscador.swift in Sources */,
 				6F09D1B93D335D97CF44813E /* Capturas.swift in Sources */,
 				8A3C1EF7009B84C262BBC464 /* Cliente.swift in Sources */,
 				D93B0A5C72A62B1302B5B377 /* Componentes.swift in Sources */,
@@ -356,7 +360,7 @@
 		};
 		C9D1559A65D4FDBF9A9AF823 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_CC734B61-1451-4E37-ACB9-D94ACEC35E9D" /* Firma.xcconfig */;
+			baseConfigurationReference = "TEMP_9C307E46-2809-4BF4-8350-51F30C69C17E" /* Firma.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -416,7 +420,7 @@
 		};
 		F0B384A6825B1D81C02C4939 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_CC734B61-1451-4E37-ACB9-D94ACEC35E9D" /* Firma.xcconfig */;
+			baseConfigurationReference = "TEMP_9C307E46-2809-4BF4-8350-51F30C69C17E" /* Firma.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

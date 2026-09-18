@@ -52,6 +52,22 @@ struct Cliente {
         return http.value(forHTTPHeaderField: "ETag")
     }
 
+    /// Con el código de 6 dígitos que muestra la computadora, recibe la clave. Devuelve una conexión ya completa.
+    static func emparejar(_ base: URL, codigo: String) async throws -> Conexion {
+        var pedido = URLRequest(url: base.appendingPathComponent("api/emparejar"))
+        pedido.httpMethod = "POST"
+        pedido.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        pedido.httpBody = try JSONSerialization.data(withJSONObject: ["codigo": codigo.filter(\.isNumber)])
+        let (datos, respuesta) = try await sesion.data(for: pedido)
+        guard let http = respuesta as? HTTPURLResponse else { throw Falla.sinRespuesta }
+        guard http.statusCode == 200 else { throw Falla.rechazado(http.statusCode) }
+        guard let cuerpo = try? JSONSerialization.jsonObject(with: datos) as? [String: Any], let clave = cuerpo["clave"] as? String,
+              var conexion = Conexion(enlace: base.absoluteString)
+        else { throw Falla.sinRespuesta }
+        conexion.clave = clave
+        return conexion
+    }
+
     func uso() async throws -> Data {
         let (datos, http) = try await enviar(pedido("api/uso"))
         guard http.statusCode == 200 else { throw Falla.rechazado(http.statusCode) }
