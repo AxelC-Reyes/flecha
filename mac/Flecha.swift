@@ -104,11 +104,23 @@ final class Delegado: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScrip
 
     private func crearIcono() {
         icono = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        let imagen = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+        // El logo: tres proyectos, cada flecha es su avance. Dibujado a mano para que quede nítido a 18 px.
+        let imagen = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
             NSColor.black.setFill()
-            NSBezierPath(roundedRect: NSRect(x: 3, y: 2.5, width: 2.5, height: 13), xRadius: 1.25, yRadius: 1.25).fill()
-            NSBezierPath(roundedRect: NSRect(x: 7.5, y: 11, width: 8, height: 3), xRadius: 1.2, yRadius: 1.2).fill()
-            NSBezierPath(roundedRect: NSRect(x: 7.5, y: 6.5, width: 5, height: 3), xRadius: 1.2, yRadius: 1.2).fill()
+            for y in [4.0, 9.0, 14.0] { NSBezierPath(ovalIn: NSRect(x: 2.5, y: y - 1.4, width: 2.8, height: 2.8)).fill() }
+            NSColor.black.setStroke()
+            for (y, largo) in [(4.0, 7.5), (9.0, 4.5)] {
+                let flecha = NSBezierPath()
+                flecha.lineWidth = 1.6
+                flecha.lineCapStyle = .round
+                flecha.lineJoinStyle = .round
+                flecha.move(to: NSPoint(x: 7.5, y: y))
+                flecha.line(to: NSPoint(x: 7.5 + largo, y: y))
+                flecha.move(to: NSPoint(x: 7.5 + largo - 2.8, y: y - 2.8))
+                flecha.line(to: NSPoint(x: 7.5 + largo, y: y))
+                flecha.line(to: NSPoint(x: 7.5 + largo - 2.8, y: y + 2.8))
+                flecha.stroke()
+            }
             return true
         }
         imagen.isTemplate = true
